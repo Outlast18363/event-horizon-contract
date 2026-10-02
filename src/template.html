@@ -1,0 +1,1389 @@
+<title>Event Horizon Contract</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+/*CM_CSS*/
+/* Layout: one dashboard screen. Top bar (chapter · progress chain · window/O2/balance), three working columns
+   (problem card | editor + tests | input view + communicator), thin console footer. Single dark look by design. */
+:root{
+  --top:#171923; --bg:#1d2030; --card:#252939; --card-2:#2d3245; --rail:#1a1d2b;
+  --line:#363b52; --line-2:#2f3448; --dim:#4a5068;
+  --fg:#dfe3ef; --fg-2:#c9cede; --muted:#a3a9c2; --faint:#8a90a8;
+  --violet:#b9a3ff; --violet-bg:#2a2e44;
+  --amber:#f2b35b; --amber-bg:#3a2f1c;
+  --red:#ff6b78; --red-soft:#ff9aa3; --red-bg:#3a1f27;
+  --cyan:#6cc9e6;
+  --green:#63e09a; --green-bg:#1f3329; --green-line:#2f4a3a;
+  --comms:#20232f;
+  --mono:'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  --sans:'IBM Plex Sans', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 var(--sans)}
+button{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--violet);outline-offset:2px}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)} .cyan{color:var(--cyan)} .amber{color:var(--amber)} .red{color:var(--red)} .green{color:var(--green)} .violet{color:var(--violet)}
+.grow{flex-grow:1}
+.app{min-height:100%;display:flex;flex-direction:column}
+
+/* top bar */
+.top{display:flex;align-items:center;flex-wrap:wrap;gap:12px 28px;min-height:56px;padding:8px 24px;background:var(--top);border-bottom:1px solid var(--line);position:sticky;top:env(safe-area-inset-top,0px);z-index:20}
+.brand{display:flex;align-items:baseline;gap:12px;font-family:var(--mono)}
+.brand b{font-weight:700;font-size:13px;letter-spacing:.24em}
+.brand span{font-size:11px;letter-spacing:.18em;color:var(--muted)}
+.chain{flex:1 1 480px;display:flex;align-items:center;justify-content:center;gap:12px;min-width:0}
+.node{display:flex;align-items:center;gap:8px;font-family:var(--mono);flex:0 0 auto}
+.node .n{width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:12px;border:1px solid var(--dim);color:var(--muted)}
+.node .l{font-size:11px;letter-spacing:.18em;color:var(--muted)}
+.node.cur .n{background:var(--violet-bg);border-color:var(--violet);color:var(--violet)} .node.cur .l{color:var(--violet)}
+.node.done .n{background:var(--green-bg);border-color:var(--green);color:var(--green)} .node.done .l{color:var(--green)}
+.conn{flex:0 1 150px;min-width:28px;border-top:1px dashed var(--dim)}
+.conn.done{border:0;display:flex;align-items:center}
+.conn.done i{flex-grow:1;height:1px;background:var(--green)}
+.conn.done span{font:11px var(--mono);color:var(--top);background:var(--green);padding:2px 8px;white-space:nowrap}
+.conn.done.fresh span{animation:tagIn .6s ease both}
+@keyframes tagIn{from{transform:scale(.6);opacity:0}to{transform:none;opacity:1}}
+.stats{display:flex;align-items:center;gap:18px;font:12px var(--mono);flex-wrap:wrap}
+.stats .k{color:var(--muted);letter-spacing:.16em}
+.balbtn{background:transparent;border:1px solid transparent;padding:6px 8px;color:var(--red);font:12px var(--mono);cursor:pointer}
+.balbtn:hover{border-color:var(--line)}
+.balbtn.pos{color:var(--green)}
+.iconbtn{min-width:36px;height:32px;background:transparent;border:1px solid var(--line);color:var(--muted);font:12px var(--mono);cursor:pointer}
+.iconbtn:hover{color:var(--fg);border-color:var(--dim)}
+.flash-red{animation:flashR 1.2s ease}
+.flash-green{animation:flashG 1.2s ease}
+@keyframes flashR{0%,40%{background:var(--red-bg)}100%{background:transparent}}
+@keyframes flashG{0%,40%{background:var(--green-bg)}100%{background:transparent}}
+
+/* screen grid */
+main{flex-grow:1}
+.wrap{display:flex;flex-wrap:wrap;gap:20px;padding:24px;align-items:flex-start}
+.col-l{flex:1 1 300px;max-width:380px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.col-c{flex:3 1 460px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.col-r{flex:1 1 300px;max-width:380px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.card{background:var(--card);border:1px solid var(--line)}
+.card.accent{border-top:2px solid var(--violet)}
+.card.accent-g{border-top:2px solid var(--green)}
+.card.accent-a{border-color:var(--amber)}
+.card.accent-r{border-color:var(--red)}
+.pad{padding:20px 22px}
+.stack{display:flex;flex-direction:column;gap:14px}
+.eyebrow{font:11px var(--mono);letter-spacing:.2em;color:var(--violet)}
+.eyebrow.green{color:var(--green)}
+.label{font-size:11px;font-weight:600;letter-spacing:.22em;color:#c3c8da;text-transform:uppercase}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.small{font-size:12px}
+h1.q{margin:0;font-size:21px;font-weight:600;line-height:1.3;text-wrap:balance}
+.blurb{margin:0;font-size:14px;line-height:1.65;color:var(--fg-2)}
+.sigbox{background:var(--bg);border:1px solid var(--line);padding:10px 12px;font:12px var(--mono);overflow-x:auto;white-space:nowrap}
+.fn{color:var(--cyan)}
+.rules{display:flex;flex-direction:column}
+.rules div{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line-2);font:12px var(--mono)}
+.rules div span:first-child{color:var(--muted)}
+.rules div span:last-child{text-align:right}
+.fromtag{display:inline-flex;align-self:flex-start;align-items:center;gap:8px;font:11px var(--mono);color:var(--muted)}
+.fromtag b{font-weight:500;color:var(--top);background:var(--green);padding:2px 8px}
+
+/* editor */
+.edhead{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card-2);border-bottom:1px solid var(--line);font:12px var(--mono)}
+.edhead .file{color:var(--violet)}
+.badge{font:10px var(--mono);letter-spacing:.16em;padding:1px 6px;border:1px solid var(--dim);color:var(--muted)}
+.edstat{color:var(--muted);font-size:11px}
+#cm{min-height:300px}
+.CodeMirror{font-variant-ligatures:none;height:auto;min-height:320px;background:var(--bg);color:var(--fg);font:13px/1.7 var(--mono)}
+.CodeMirror-scroll{min-height:320px}
+.CodeMirror-gutters{background:var(--bg);border-right:1px solid var(--line-2)}
+.CodeMirror-linenumber{color:var(--faint);padding:0 10px 0 6px}
+.CodeMirror-cursor{border-left:2px solid var(--violet)}
+.CodeMirror-selected,.CodeMirror-focused .CodeMirror-selected{background:#3a3f5c}
+.CodeMirror-activeline-background{background:#232739}
+.CodeMirror-matchingbracket{color:var(--green)!important;text-decoration:underline}
+.cm-s-eh .cm-keyword{color:#c792ea}.cm-s-eh .cm-string{color:#9fe0a8}.cm-s-eh .cm-number{color:var(--amber)}
+.cm-s-eh .cm-comment{color:var(--muted);font-style:italic}.cm-s-eh .cm-def{color:var(--cyan)}.cm-s-eh .cm-builtin{color:var(--cyan)}
+.cm-s-eh .cm-variable-2{color:#e6c79c}.cm-s-eh .cm-operator{color:var(--fg-2)}.cm-s-eh .cm-meta{color:var(--violet)}.cm-s-eh .cm-atom{color:var(--amber)}
+.cm-errline{background:#3a1f27!important}
+textarea.fallback{width:100%;min-height:340px;background:var(--bg);color:var(--fg);border:0;padding:12px;font:13px/1.7 var(--mono);resize:vertical;tab-size:4}
+
+.actions{padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.chips{display:flex;gap:8px;flex-wrap:wrap;min-width:0}
+.chip{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border:1px dashed var(--dim);font:11px var(--mono);color:var(--muted);white-space:nowrap}
+.chip.idle{border-style:solid;border-color:var(--line)}
+.chip.pass{border:1px solid var(--green-line);color:var(--green)}
+.chip.fail{border:1px solid #5a2f38;color:var(--red)}
+.btn{min-height:44px;padding:0 18px;background:transparent;border:1px solid var(--dim);color:var(--fg);font:12px var(--mono);letter-spacing:.16em;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}
+.btn:hover:not(:disabled){border-color:var(--muted)}
+.btn.primary{background:var(--amber);border-color:var(--amber);color:var(--top);font-weight:700}
+.btn.primary:hover:not(:disabled){background:#f6c37a}
+.btn.ghost-g{border-color:var(--green-line);color:var(--green)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.console{padding:12px 14px;font:12px/1.6 var(--mono);min-height:64px;max-height:300px;overflow:auto;white-space:pre-wrap;word-break:break-word}
+.console .ln{display:block}
+.console .dim{color:var(--faint)}
+.console .ok{color:var(--green)} .console .bad{color:var(--red)} .console .warn{color:var(--amber)} .console .out{color:var(--fg-2)}
+.console .hd{color:var(--muted);letter-spacing:.14em;font-size:11px}
+
+/* viz */
+.viz{padding:18px 20px;display:flex;flex-direction:column;gap:12px}
+.gridwrap{overflow:auto;max-width:100%}
+.gridwrap svg{display:block;max-width:100%;height:auto}
+.g-cell{fill:var(--bg);stroke:var(--line-2);stroke-width:1}
+.g-path{fill:var(--violet-bg);stroke:var(--violet);stroke-width:1}
+.g-start{fill:none;stroke:var(--muted);stroke-width:1}
+.g-stop{fill:var(--amber-bg);stroke:var(--amber);stroke-width:1.5}
+.g-you{fill:none;stroke:var(--violet);stroke-width:2;stroke-dasharray:3 2}
+.g-drone{fill:var(--cyan)}
+.g-dronepath{fill:#1f2f38;stroke:var(--cyan);stroke-width:1}
+.g-empty{fill:var(--red-bg);stroke:var(--red);stroke-width:1.5}
+.g-found{fill:var(--amber-bg);stroke:var(--amber);stroke-width:2}
+.g-txt{font:10px var(--mono);fill:var(--muted)}
+.g-txt.a{fill:var(--amber)} .g-txt.r{fill:var(--red)} .g-txt.v{fill:var(--violet)}
+.segs{display:flex;gap:6px;flex-wrap:wrap}
+.seg{min-height:32px;padding:0 10px;background:transparent;border:1px solid var(--line);color:var(--muted);font:11px var(--mono);cursor:pointer}
+.seg[aria-pressed="true"]{border-color:var(--violet);color:var(--violet);background:var(--violet-bg)}
+.logtape{font:11px/1.6 var(--mono);color:var(--faint);word-break:break-all;background:var(--bg);border:1px solid var(--line-2);padding:8px 10px}
+.logtape b{color:var(--violet);font-weight:500}
+.crates{display:flex;flex-wrap:wrap;gap:6px}
+.crate{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:40px;padding:5px 7px;border:1px solid var(--dim);background:var(--bg);font:12px var(--mono)}
+.crate small{font-size:9px;color:var(--muted);letter-spacing:.08em;min-height:12px}
+.crate.i{border-color:var(--violet)} .crate.j{border-color:var(--amber)}
+.crate.rise-in{animation:riseIn .35s ease both}
+@keyframes riseIn{from{transform:translateY(6px);opacity:0}to{transform:none;opacity:1}}
+table.ct{width:100%;border-collapse:collapse;font:11px var(--mono)}
+table.ct th{font-weight:500;text-align:left;color:var(--muted);letter-spacing:.12em;padding:6px 4px;border-bottom:1px solid var(--line)}
+table.ct td{padding:5px 4px;border-bottom:1px solid var(--line-2);white-space:nowrap}
+table.ct td.num{text-align:right;font-variant-numeric:tabular-nums}
+.tv{padding:1px 6px;border:1px solid}
+.tv.ok{color:var(--green);border-color:var(--green-line)} .tv.slag{color:var(--red);border-color:#5a2f38} .tv.gr{color:var(--faint);border-color:var(--line);border-style:dashed}
+.yr{font-weight:500}
+.yr.ch{color:var(--green)} .yr.sl{color:var(--muted)} .yr.ob{color:var(--amber)} .yr.er{color:var(--red)} .yr.na{color:var(--faint)}
+.opsbar{display:inline-block;width:56px;height:6px;background:var(--line-2);vertical-align:middle;position:relative}
+.opsbar i{position:absolute;left:0;top:0;bottom:0;background:var(--cyan)}
+.opsbar.over i{background:var(--amber)}
+.tablewrap{overflow-x:auto}
+
+/* comms */
+.comms{background:var(--comms);border:1px solid var(--dim);display:flex;flex-direction:column;box-shadow:0 12px 32px rgba(0,0,0,.35)}
+.comms.unk{border:1px dashed var(--red)}
+.comms .ch{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.comms .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+.comms.unk .dot{background:var(--red)}
+.comms .ct{font:10px var(--mono);letter-spacing:.2em;color:#c3c8da;flex-grow:1}
+.comms .body{padding:14px;display:flex;flex-direction:column;gap:12px}
+.msg{display:flex;flex-direction:column;gap:3px}
+.msg .who{font:10px var(--mono);letter-spacing:.14em;color:var(--muted)}
+.msg .tx{font-size:13px;line-height:1.55}
+.msg.unk .who{color:var(--red-soft)}
+.msg.unk .tx{font-family:var(--mono);color:var(--red-soft)}
+.msg.me{align-self:flex-end;max-width:85%;background:var(--violet-bg);padding:6px 10px;font-size:13px;color:var(--violet)}
+.fresh{animation:msgIn .4s ease both;animation-delay:calc(var(--i,0) * 650ms)}
+@keyframes msgIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.replies{display:flex;gap:8px;flex-wrap:wrap;padding:0 14px 14px}
+.replies button{min-height:44px;padding:0 12px;background:transparent;border:1px solid var(--dim);color:var(--fg);font-size:12px;cursor:pointer}
+.replies button:hover{border-color:var(--violet);color:var(--violet)}
+.relay{display:flex;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--line);font:10px var(--mono);letter-spacing:.14em;color:var(--faint)}
+.relay.open{color:var(--green)}
+
+/* wake */
+.letter{flex:2 1 560px;min-width:0;display:flex;flex-direction:column}
+.letter .lh{padding:24px 28px 18px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.letter h1{margin:0;font-size:22px;font-weight:600;text-wrap:balance}
+.meta{display:grid;grid-template-columns:110px minmax(0,1fr);row-gap:6px;margin:0;font:12px var(--mono)}
+.meta dt{letter-spacing:.16em;color:var(--muted)} .meta dd{margin:0}
+.letter .lb{padding:22px 28px;display:flex;flex-direction:column;gap:14px;font-size:15px;line-height:1.7;max-width:760px}
+.letter .lb p{margin:0}
+.attach{display:flex;align-items:center;gap:16px;flex-wrap:wrap;margin:0 28px 24px;padding:14px 18px;background:var(--bg);border:1px solid var(--amber);color:var(--fg);max-width:560px;cursor:pointer;text-align:left}
+.attach:hover{background:#222637}
+.letter .lr{margin-top:auto;padding:18px 28px 24px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.letter .lr input{height:44px;padding:0 14px;background:var(--bg);border:1px solid var(--line);color:var(--muted);font:13px var(--mono);width:100%}
+.facts{flex:1 1 300px;max-width:400px;min-width:0}
+.facts .rules div{font-size:12px}
+
+/* transitions */
+.stage{flex:2 1 560px;min-width:0;padding:22px 24px;display:flex;flex-direction:column;gap:18px}
+.side{flex:1 1 340px;max-width:420px;min-width:0;display:flex;flex-direction:column;gap:20px}
+.bignum{font:700 34px var(--mono);color:var(--amber);line-height:1.1}
+.toggle{width:46px;height:26px;padding:0;border:0;background:var(--line);cursor:pointer;display:flex;align-items:center;flex:0 0 auto}
+.toggle span{width:22px;height:22px;background:var(--fg);margin-left:2px;transition:margin .2s}
+.toggle[aria-pressed="true"]{background:var(--green)}
+.toggle[aria-pressed="true"] span{margin-left:22px}
+.toggle:disabled{cursor:default}
+.field{display:flex;flex-direction:column;gap:4px;font:11px var(--mono)}
+.field div{display:flex;justify-content:space-between;gap:10px}
+.pods{display:flex;gap:10px;flex-wrap:wrap}
+.pod{width:64px;height:84px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:var(--bg);border:1px solid var(--line);font:12px var(--mono);color:var(--muted);position:relative}
+.pod small{font-size:9px;letter-spacing:.1em}
+.pod.lit{background:var(--green-bg);border-color:var(--green);color:var(--green)}
+.pod.lit b{animation:rise .5s ease both}
+.pod.nofuel{background:var(--red-bg);border-color:var(--red);color:var(--red);border-style:dashed}
+.pod.armed{border-color:var(--amber);color:var(--amber)}
+@keyframes rise{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+.assayhead{display:flex;align-items:baseline;gap:14px;flex-wrap:wrap}
+.assayhead b{font:700 34px var(--mono);color:var(--red)}
+.kv{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 16px;font:12px var(--mono)}
+.kv span:nth-child(odd){color:var(--muted)}
+.kv span:nth-child(even){text-align:right;font-variant-numeric:tabular-nums}
+.quota{height:8px;background:var(--line-2);position:relative}
+.quota i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);transition:width 1s ease}
+.quota.met i{background:var(--green)}
+.quota em{position:absolute;top:-4px;bottom:-4px;width:1px;background:var(--fg-2)}
+.tape{font:12px/1.8 var(--mono);color:var(--muted);background:var(--bg);border:1px solid var(--line-2);padding:12px 14px;min-height:150px}
+.tape .ln{display:block;animation:msgIn .3s ease both}
+.tape .hl{color:var(--amber);background:var(--amber-bg);padding:0 4px}
+.hidden-soft{visibility:hidden}
+
+/* footer */
+.foot{display:flex;align-items:center;flex-wrap:wrap;min-height:36px;background:var(--top);border-top:1px solid var(--line);font-size:13px;color:var(--muted)}
+.foot > span{padding:0 16px;line-height:36px;display:flex;align-items:center;gap:8px}
+.foot .sep{border-right:1px solid var(--line)}
+.foot .dl{border-left:1px solid var(--line)}
+.rtdot{width:6px;height:6px;border-radius:50%;background:var(--amber)}
+.rtdot.ready{background:var(--green)} .rtdot.failed{background:var(--red)}
+
+/* overlays */
+.pop{position:fixed;z-index:40;right:16px;top:64px;width:min(420px,calc(100vw - 32px));background:var(--card);border:1px solid var(--line);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+.pop .ph{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;background:var(--card-2);border-bottom:1px solid var(--line)}
+.ledger{max-height:50vh;overflow:auto;padding:4px 16px 12px}
+.ledger div{display:grid;grid-template-columns:52px minmax(0,1fr) auto;gap:10px;padding:7px 0;border-bottom:1px solid var(--line-2);font:12px var(--mono)}
+.ledger div span:first-child{color:var(--faint)}
+.ledger div span:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.ledger .tot{border-bottom:0;padding-top:10px}
+.modalbg{position:fixed;inset:0;z-index:50;background:rgba(10,11,18,.7);display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto}
+.modal{width:min(640px,100%);background:var(--card);border:1px solid var(--line);border-top:2px solid var(--violet)}
+.modal .mb{padding:20px 24px;display:flex;flex-direction:column;gap:14px;font-size:14px;line-height:1.65;color:var(--fg-2)}
+.modal .mb p{margin:0}
+.modal h2{margin:0;font-size:18px;font-weight:600;color:var(--fg)}
+.modal code{font:12px var(--mono);color:var(--cyan)}
+.modal .row{display:flex;gap:10px;flex-wrap:wrap;padding:0 24px 20px}
+.boot{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--bg);z-index:60;font:12px var(--mono);color:var(--muted);letter-spacing:.2em}
+
+*{font-variant-ligatures:none!important}
+.tape .ln{white-space:pre-wrap}
+@media (max-width: 720px){
+  .top{padding:8px 16px;position:static}
+  .wrap{padding:16px}
+  .chain{order:3;flex-basis:100%;justify-content:flex-start;overflow-x:auto}
+  .node{flex:0 0 auto} .node .l{display:none}
+  .conn{flex:1 1 16px;min-width:12px}
+  .conn.done{flex:0 0 auto} .conn.done i{flex:0 0 8px}
+  .letter .lh,.letter .lb,.letter .lr{padding-left:18px;padding-right:18px}
+  .attach{margin:0 18px 20px}
+  .bignum,.assayhead b{font-size:28px}
+  .col-l,.col-r,.side,.facts{max-width:none}
+}
+@media (prefers-reduced-motion: reduce){
+  *,*::before,*::after{animation-duration:.01ms!important;animation-delay:0ms!important;transition-duration:.01ms!important}
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="brand"><b>LETHE</b><span>CH.1 · COLD START</span></div>
+    <nav class="chain" id="chain" aria-label="Chapter progress"></nav>
+    <div class="stats">
+      <span><span class="k">WINDOW </span><span id="hWin" class="cyan">T−72:00</span></span>
+      <span><span class="k">O₂ </span><span id="hO2" class="amber">62%</span></span>
+      <button type="button" class="balbtn" id="hBal" aria-haspopup="dialog" aria-label="Open ledger">−48,200 cr</button>
+      <button type="button" class="iconbtn" id="helpBtn" aria-label="How to play">?</button>
+    </div>
+  </header>
+  <main id="screen"></main>
+  <footer class="foot">
+    <span class="sep">Console</span>
+    <span><span class="rtdot" id="rtDot"></span><span id="rtTxt">Python interpreter booting…</span></span>
+    <span class="grow"></span>
+    <span class="dl mono small"><span class="cyan">LOCAL ×1.38</span></span>
+    <span class="dl small">MERIT online · relay latency 4.2 s</span>
+  </footer>
+</div>
+
+<div class="pop" id="ledgerPop" role="dialog" aria-label="Ledger" hidden>
+  <div class="ph"><span class="label">LEDGER · CONTRACTOR #0417</span><button type="button" class="iconbtn" id="ledgerClose" aria-label="Close ledger">×</button></div>
+  <div class="ledger" id="ledgerBody"></div>
+</div>
+
+<div class="modalbg" id="helpBg" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="edhead"><span class="label" style="flex-grow:1">CONTRACTOR BRIEFING</span><button type="button" class="iconbtn" id="helpClose" aria-label="Close briefing">×</button></div>
+    <div class="mb">
+      <h2 id="helpTitle">Your code runs the outpost</h2>
+      <p>Each work order asks for one Python function. <b>RUN</b> checks it against the calibration samples, which costs nothing. The amber button hands the function to the world: its return value is what the drone, the launch rail or the assay box actually does, and the ledger moves with it.</p>
+      <p>The output of one work order is the input of the next. Python 3.12 runs in your browser via Pyodide; nothing leaves this page.</p>
+      <p><b>Compute budget</b> (work order ③): every loop iteration and function call costs 1 op. Built-ins that walk a collection cost one op per element: <code>Counter(x)</code>, <code>sorted(x)</code>, <code>sum(x)</code>, slicing <code>s[a:b]</code>, <code>x in list_or_str</code>, <code>list.count</code>. Comparing two dicts or lists costs 1. A crate whose scan runs past 1,000,000 ops stays unverified.</p>
+      <p class="muted small mono">Shortcuts: Ctrl/⌘ + Enter runs calibration.</p>
+    </div>
+    <div class="row">
+      <button type="button" class="btn" id="refBtn">INSERT REFERENCE SOLUTION</button>
+      <button type="button" class="btn" id="resetCode">RESET THIS FILE</button>
+      <span class="grow"></span>
+      <button type="button" class="btn" id="restartBtn">RESTART CHAPTER</button>
+    </div>
+  </div>
+</div>
+
+<script type="text/plain" id="harness">#HARNESS#</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/python/python.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+<script>
+(function(){
+'use strict';
+/* ================= utilities ================= */
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const minus = n => (n < 0 ? '−' + Math.abs(n) : String(n));
+const fmtPt = p => '(' + minus(p[0]) + ', ' + minus(p[1]) + ')';
+const fmtN = n => Math.abs(n).toLocaleString('en-US');
+const fmtBal = n => (n < 0 ? '−' : '') + fmtN(n) + ' cr';
+const fmtAmt = n => (n < 0 ? '−' : '+') + fmtN(n);
+const kg = t => (t / 10).toFixed(1);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const reduced = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+const stepMs = ms => reduced ? 0 : ms;
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ================= world data ================= */
+const WINDOW_MIN = 72 * 60;
+const START_BAL = -48200;
+const RATE = 820;            // cr per kg of accepted chronite
+const LAUNCH_FEE = 1200, FUEL = 8, LIMIT = 180;
+const WATCHDOG = 5000000, BUDGET = 1000000;
+const QUOTA10 = 400;
+
+// id, kg, tender verdict, chronite yield (tenths of a kg)
+const CRATES = [
+  ['C01',150,'OK',36],['C02',40,'SLAG',16],['C03',95,'SLAG',42],['C04',120,'OK',28],['C05',60,'SLAG',26],
+  ['C06',175,'SLAG',68],['C07',30,'OK',12],['C08',85,'SLAG',36],['C09',110,'OK',26],['C10',70,'SLAG',28],
+  ['C11',165,'SLAG',64],['C12',20,'OK',10],['C13',100,'SLAG',0],['C14',55,'SLAG',24]
+].map(([id,w,tender,y10]) => ({id,w,tender,y10}));
+const CRATE_KG = CRATES.map(c => c.w);
+// optimal manifest (doc table), used to decide which pods stay grounded when the manifest asks for more than 8
+const POD_PLAN = [['C06'],['C11'],['C01','C12'],['C04','C07'],['C09','C02'],['C13','C14'],['C03','C05'],['C08','C10']];
+
+const R2_PREFIX = 'FFRFFFFRFFFFFLFFF';   // 14 F and 3 turns: ends at (7, -3) with battery 14
+const R2_LOG = (() => { const r = mulberry32(417); let s = R2_PREFIX; for (let i = R2_PREFIX.length; i < 3412; i++) { const v = r(); s += v < 0.62 ? 'F' : (v < 0.81 ? 'L' : 'R'); } return s; })();
+
+function simRover(log, battery){
+  const D = [[0,1],[1,0],[0,-1],[-1,0]];
+  let x = 0, y = 0, d = 0, used = 0; const path = [[0,0]];
+  for (let i = 0; i < log.length; i++){
+    if (battery === 0) break;
+    used = i + 1; const c = log[i];
+    if (c === 'L') d = (d + 3) % 4; else if (c === 'R') d = (d + 1) % 4;
+    else if (c === 'F'){ x += D[d][0]; y += D[d][1]; battery--; path.push([x,y]); }
+  }
+  return {end:[x,y], path, used, ignored: log.length - used};
+}
+const R2_SIM = simRover(R2_LOG, 14);
+
+const SIG_LEN = 2400;
+const SCAN_LEN = {C01:200000,C02:4000,C03:9500,C04:12000,C05:6000,C06:200000,C07:3000,C08:8500,C09:11000,C10:7000,C11:200000,C12:2600,C13:30000,C14:5500};
+let SCANS = null;
+function findPerm(text, sig){
+  const k = sig.length; if (k > text.length) return -1;
+  const need = new Int32Array(26), win = new Int32Array(26);
+  for (let i = 0; i < k; i++) need[sig.charCodeAt(i) - 97]++;
+  let diff = 0; for (let l = 0; l < 26; l++) if (need[l]) diff++;
+  const upd = (l, dv) => { if (win[l] === need[l]) diff++; win[l] += dv; if (win[l] === need[l]) diff--; };
+  for (let i = 0; i < text.length; i++){
+    upd(text.charCodeAt(i) - 97, 1);
+    if (i >= k) upd(text.charCodeAt(i - k) - 97, -1);
+    if (i >= k - 1 && diff === 0) return i - k + 1;
+  }
+  return -1;
+}
+function genScans(){
+  if (SCANS) return SCANS;
+  const r = mulberry32(0x0416);
+  const sigSet = 'bcdfhjkmnpqsvx', offSet = 'aegilortuwyz';
+  const sw = [...sigSet].map(() => 0.3 + r()), swT = sw.reduce((a,b) => a + b, 0);
+  const nw = Array.from({length:26}, () => 0.5 + r()), nwT = nw.reduce((a,b) => a + b, 0);
+  const pickSig = () => { let v = r() * swT; for (let i = 0; i < 14; i++){ v -= sw[i]; if (v <= 0) return sigSet.charCodeAt(i); } return sigSet.charCodeAt(13); };
+  const pickNoise = () => { let v = r() * nwT; for (let i = 0; i < 26; i++){ v -= nw[i]; if (v <= 0) return 97 + i; } return 122; };
+  const sig = new Uint8Array(SIG_LEN); for (let i = 0; i < SIG_LEN; i++) sig[i] = pickSig();
+  const perm = () => { const a = sig.slice(); for (let i = a.length - 1; i > 0; i--){ const j = Math.floor(r() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; };
+  const decoy = () => { const a = perm(); const k = 100 + Math.floor(r() * (a.length - 200)); a[k] = offSet.charCodeAt(Math.floor(r() * offSet.length)); return a; };
+  const dec = new TextDecoder('ascii');
+  const out = {sig: dec.decode(sig), scans:{}};
+  for (const c of CRATES){
+    const len = SCAN_LEN[c.id]; const buf = new Uint8Array(len);
+    for (let i = 0; i < len; i++) buf[i] = pickNoise();
+    const long = len >= 100000; let truePos = -1; const decoys = [];
+    if (c.y10 > 0){
+      truePos = long ? 120000 + Math.floor(r() * 70000) : 20 + Math.floor(r() * Math.min(130, len - SIG_LEN - 20));
+      buf.set(perm(), truePos);
+      if (long){ for (const base of [15000, 55000, 95000]) decoys.push(base + Math.floor(r() * 8000)); }
+      else { let p = truePos + SIG_LEN + 300 + Math.floor(r() * 400); while (p + SIG_LEN < len && decoys.length < 2){ decoys.push(p); p += SIG_LEN + 300 + Math.floor(r() * 600); } }
+    } else {
+      for (const base of [2000, 9000, 17000, 25000]) decoys.push(base + Math.floor(r() * 1500));
+    }
+    for (const p of decoys) buf.set(decoy(), p);
+    const text = dec.decode(buf);
+    const found = findPerm(text, out.sig);
+    if ((c.y10 > 0) !== (found >= 0) || (found >= 0 && found !== truePos)) console.warn('scan generation mismatch', c.id, found, truePos);
+    out.scans[c.id] = {text, len, truePos, truth: found >= 0};
+  }
+  SCANS = out; return out;
+}
+
+/* ================= problems ================= */
+const PROB = {
+  q1: {
+    num:'①', key:'LOCATE', title:'Where did rover R-2 stop?',
+    blurb:'R-2 hauled the last crates out of the dig site, then its battery died. GPS is down. Its command log survived.',
+    sig:'<span class="fn">locate_rover</span>(log, battery) -&gt; (x, y)',
+    rules:[['START','(0, 0) facing N'],['F','move 1 · costs 1'],['L / R','turn 90° · free'],['BATTERY 0','rover stops for good']],
+    file:'locate.py', fn:'locate_rover', kind:'point', go:'DISPATCH ›', storyLabel:'R-2 log · hidden',
+    calib:[{id:'k1',label:'FFRFFLF, 4',args:['FFRFFLF',4],expect:[2,2]},{id:'k2',label:'LLFF, 9',args:['LLFF',9],expect:[0,-2]}],
+    hidden:[{id:'h1',label:'RRRRF, 1',args:['RRRRF',1],expect:[0,1]},{id:'h2',label:'FFF, 0',args:['FFF',0],expect:[0,0]}],
+    story:() => ({id:'story', label:'R-2 log · 3,412 cmds', args:[R2_LOG,14], expect:[7,-3]}),
+    starter:
+`DIRS = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # N E S W
+
+def locate_rover(log: str, battery: int) -> tuple[int, int]:
+    x, y, d = 0, 0, 0
+    for c in log:
+        if c == "L":
+            d = (d - 1) % 4
+        elif c == "R":
+            d = (d + 1) % 4
+        elif c == "F":
+            # what happens when the battery is empty?
+            x, y = x + DIRS[d][0], y + DIRS[d][1]
+            battery -= 1
+    return (x, y)
+`,
+    reference:
+`DIRS = [(0, 1), (1, 0), (0, -1), (-1, 0)]  # N E S W
+
+def locate_rover(log: str, battery: int) -> tuple[int, int]:
+    x, y, d = 0, 0, 0
+    for c in log:
+        if battery == 0:
+            break  # dead battery: every later command is ignored
+        if c == "L":
+            d = (d - 1) % 4
+        elif c == "R":
+            d = (d + 1) % 4
+        elif c == "F":
+            x, y = x + DIRS[d][0], y + DIRS[d][1]
+            battery -= 1
+    return (x, y)
+`
+  },
+  q2: {
+    num:'②', key:'LAUNCH', title:'Get every crate to the orbital tender.',
+    blurb:'Each pod carries at most two crates. Fuel is left for exactly 8 burns. A crate that doesn’t fly stays here, and so does its pay.',
+    sig:'<span class="fn">min_launches</span>(crates, limit) -&gt; int',
+    rules:[['PER POD','≤ 2 crates'],['LIMIT','180 kg per pod'],['FEE','1,200 cr / launch'],['FUEL','8 burns']],
+    from:'q1', file:'manifest.py', fn:'min_launches', kind:'int', go:'LAUNCH ›', storyLabel:'your 14 crates · hidden',
+    calib:[{id:'k1',label:'[1,2], 3',args:[[1,2],3],expect:1},{id:'k2',label:'[3,2,2,1], 3',args:[[3,2,2,1],3],expect:3}],
+    hidden:[{id:'h1',label:'[3,5,3,4], 5',args:[[3,5,3,4],5],expect:4},{id:'h2',label:'10 × 180, 180',args:[Array(10).fill(180),180],expect:10}],
+    story:() => ({id:'story', label:'your 14 crates, 180', args:[CRATE_KG.slice(),LIMIT], expect:8}),
+    starter:
+`def min_launches(crates: list[int], limit: int) -> int:
+    crates.sort()
+    i, j = 0, len(crates) - 1
+    launches = 0
+    while i <= j:
+        # can the lightest ride with the heaviest?
+
+        j -= 1
+        launches += 1
+    return launches
+`,
+    reference:
+`def min_launches(crates: list[int], limit: int) -> int:
+    crates.sort()
+    i, j = 0, len(crates) - 1
+    launches = 0
+    while i <= j:
+        # can the lightest ride with the heaviest?
+        if crates[i] + crates[j] <= limit:
+            i += 1
+        j -= 1
+        launches += 1
+    return launches
+`
+  },
+  q3: {
+    num:'③', key:'VERIFY', title:'Are the rejected crates really slag?',
+    blurb:'Chronite emits a fixed set of spectral lines. Erebus scrambles their order, never their count. If any window of a crate’s scan holds exactly the signature, it’s chronite.',
+    sig:'<span class="fn">is_chronite</span>(scan, signature) -&gt; bool',
+    rules:[['LINES','a–z, one letter each'],['SCAN','≤ 200,000 lines'],['SIGNATURE','≤ 10,000 lines'],['BUDGET','1,000,000 ops / crate']],
+    from:'q2', file:'assay.py', fn:'is_chronite', kind:'bool', go:'RUN ASSAY ›', storyLabel:'14 crate scans · hidden',
+    calib:[{id:'k1',label:'"qcbaebabcd", "abc"',args:['qcbaebabcd','abc'],expect:true},{id:'k2',label:'"xyz", "zz"',args:['xyz','zz'],expect:false}],
+    hidden:[{id:'h1',label:'"eidbaooo", "ab"',args:['eidbaooo','ab'],expect:true},{id:'h2',label:'"eidboaoo", "ab"',args:['eidboaoo','ab'],expect:false}],
+    starter:
+`from collections import Counter
+
+def is_chronite(scan: str, signature: str) -> bool:
+    k = len(signature)
+    need = Counter(signature)
+    window = Counter(scan[:k])
+    if window == need:
+        return True
+    for i in range(k, len(scan)):
+        # slide: one line in, one line out
+        pass
+    return False
+`,
+    reference:
+`from collections import Counter
+
+def is_chronite(scan: str, signature: str) -> bool:
+    k = len(signature)
+    need = Counter(signature)
+    window = Counter(scan[:k])
+    if window == need:
+        return True
+    for i in range(k, len(scan)):
+        # slide: one line in, one line out
+        window[scan[i]] += 1
+        out = scan[i - k]
+        window[out] -= 1
+        if window[out] == 0:
+            del window[out]
+        if window == need:
+            return True
+    return False
+`
+  }
+};
+
+/* ================= state ================= */
+const SAVE_KEY = 'ehc-ch1-v1';
+function freshState(){
+  return {
+    stage:'wake', min:0, tags:{}, code:{},
+    ledger:[{min:0, label:'Transit, berth & onboarding', amt:START_BAL}],
+    calib:{q1:{}, q2:{}, q3:{}}, ui:{q1sel:'k1'},
+    stats:{dispatches:0, wrong:0, maxOps:0},
+    h1:null, h2:null, q3:null, end:null,
+    comms:{beat:'wake', picks:{}, params:{}}
+  };
+}
+let S = freshState();
+try { const raw = localStorage.getItem(SAVE_KEY); if (raw){ const v = JSON.parse(raw); if (v && v.stage) S = Object.assign(freshState(), v); } } catch(e){}
+let saveT = null;
+function save(){ clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch(e){} }, 150); }
+const balance = () => S.ledger.reduce((a, e) => a + e.amt, 0);
+function post(label, amt){ S.ledger.push({min:S.min, label, amt}); save(); updateTop(amt < 0 ? 'red' : 'green'); }
+function advance(min){ S.min += min; save(); updateTop(); }
+
+/* ================= top bar ================= */
+function clockText(){
+  const left = WINDOW_MIN - S.min;
+  const a = Math.abs(left), h = Math.floor(a / 60), m = a % 60;
+  return (left >= 0 ? 'T−' : 'T+') + String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+}
+const o2 = () => Math.max(0, Math.floor(62 - (S.min / 60) * 0.45));
+function updateTop(flash){
+  const w = $('#hWin'); w.textContent = clockText(); w.className = S.min > WINDOW_MIN ? 'red' : 'cyan';
+  $('#hO2').textContent = o2() + '%';
+  const b = $('#hBal'), bal = balance();
+  b.textContent = fmtBal(bal); b.classList.toggle('pos', bal >= 0);
+  if (flash){ b.classList.remove('flash-red','flash-green'); void b.offsetWidth; b.classList.add(flash === 'red' ? 'flash-red' : 'flash-green'); }
+  if (!$('#ledgerPop').hidden) renderLedger();
+}
+let freshTag = null;
+function renderChain(){
+  const nodes = [['q1','LOCATE'],['q2','LAUNCH'],['q3','VERIFY']];
+  const cur = S.stage === 'wake' ? null : (nodes.find(([k]) => !S.tags[k]) || [null])[0];
+  $('#chain').innerHTML = nodes.map(([k, l], i) => {
+    const done = !!S.tags[k], st = done ? 'done' : (k === cur ? 'cur' : 'todo');
+    let h = `<div class="node ${st}"><span class="n">${done ? '✓' : i + 1}</span><span class="l">${l}</span></div>`;
+    if (i < 2) h += done ? `<div class="conn done ${freshTag === k ? 'fresh' : ''}"><i></i><span>${esc(S.tags[k])}</span><i></i></div>` : '<div class="conn"></div>';
+    return h;
+  }).join('') + (S.tags.q3 ? `<div class="conn done ${freshTag === 'q3' ? 'fresh' : ''}" style="flex-basis:90px"><i></i><span>${esc(S.tags.q3)}</span></div>` : '');
+  freshTag = null;
+}
+function setTag(k, v){ S.tags[k] = v; freshTag = k; save(); renderChain(); }
+function renderLedger(){
+  const rows = S.ledger.map(e => `<div><span>${elapsed(e.min)}</span><span>${esc(e.label)}</span><span class="${e.amt < 0 ? 'red' : 'green'}">${fmtAmt(e.amt)}</span></div>`).join('');
+  const bal = balance();
+  $('#ledgerBody').innerHTML = rows + `<div class="tot"><span></span><span class="muted">Balance · contract ends when positive</span><span class="${bal < 0 ? 'red' : 'green'}">${fmtBal(bal)}</span></div>` +
+    `<div class="tot"><span></span><span class="muted small">Life support: 800 cr / Earth day × 1.38 = 1,104 cr per local day (clause 14.2)</span><span></span></div>`;
+}
+function elapsed(min){ const left = WINDOW_MIN - min; const h = Math.floor(Math.abs(left)/60), m = Math.abs(left) % 60; return (left >= 0 ? 'T−' : 'T+') + h + ':' + String(m).padStart(2,'0'); }
+
+/* ================= Python runtime ================= */
+const RT = {status:'loading', version:'', worker:null, mode:'worker', pending:new Map(), seq:0, ready:null, mainRun:null, error:''};
+const HARNESS = $('#harness').textContent;
+const PY_BASE = new URL('pyodide/', location.href).href;
+function workerMain(){
+  let runJob = null;
+  const ready = (async () => {
+    importScripts(BASE + 'pyodide.js');
+    const txt = await (await fetch(BASE + 'python_stdlib.b64.txt')).text();
+    const s = atob(txt.replace(/\s+/g, '')); const bin = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) bin[i] = s.charCodeAt(i);
+    const py = await loadPyodide({indexURL: BASE, stdLibURL: URL.createObjectURL(new Blob([bin]))});
+    py.runPython(HARNESS);
+    runJob = py.globals.get('run_job');
+    postMessage({type:'ready', version: py.runPython('import sys; sys.version.split()[0]')});
+  })().catch(e => postMessage({type:'fail', error: String((e && e.message) || e)}));
+  self.onmessage = async e => {
+    try { await ready; postMessage({type:'result', id:e.data.id, result: runJob(e.data.job)}); }
+    catch (err){ postMessage({type:'result', id:e.data.id, result: JSON.stringify({compile:{line:null, message:'Interpreter unavailable: ' + String((err && err.message) || err)}, cases:[]})}); }
+  };
+}
+function setRT(status, extra){
+  RT.status = status; if (extra) Object.assign(RT, extra);
+  const dot = $('#rtDot'), t = $('#rtTxt');
+  dot.className = 'rtdot ' + (status === 'ready' ? 'ready' : status === 'failed' ? 'failed' : '');
+  t.textContent = status === 'ready' ? 'Python ' + RT.version + ' · ready' : status === 'failed' ? 'Python interpreter failed to load: ' + RT.error : 'Python interpreter booting… (first load ≈ 14 MB)';
+  const f = $('#rtFact'); if (f) f.textContent = t.textContent;
+}
+function bootRuntime(){
+  let res, rej; RT.ready = new Promise((a, b) => { res = a; rej = b; }); RT.ready.catch(() => {});
+  setRT('loading');
+  const fallback = (why) => { console.warn('worker unavailable, using main thread:', why); bootMain().then(res, rej); };
+  let w;
+  try {
+    const src = 'const BASE=' + JSON.stringify(PY_BASE) + ';const HARNESS=' + JSON.stringify(HARNESS) + ';(' + workerMain.toString() + ')();';
+    w = new Worker(URL.createObjectURL(new Blob([src], {type:'text/javascript'})));
+  } catch (e){ fallback(e); return; }
+  RT.worker = w; RT.mode = 'worker';
+  let gotReady = false;
+  w.onmessage = e => {
+    const m = e.data;
+    if (m.type === 'ready'){ gotReady = true; setRT('ready', {version:m.version}); res(); }
+    else if (m.type === 'fail'){ if (!gotReady){ w.terminate(); fallback(m.error); } }
+    else if (m.type === 'result'){ const p = RT.pending.get(m.id); if (p){ RT.pending.delete(m.id); clearTimeout(p.timer); p.resolve(JSON.parse(m.result)); } }
+  };
+  w.onerror = e => { e.preventDefault && e.preventDefault(); if (!gotReady){ w.terminate(); fallback(e.message || 'worker error'); } };
+}
+function loadScript(src){ return new Promise((a, b) => { const s = document.createElement('script'); s.src = src; s.onload = a; s.onerror = () => b(new Error('could not load ' + src)); document.head.appendChild(s); }); }
+async function bootMain(){
+  RT.mode = 'main';
+  try {
+    await loadScript(PY_BASE + 'pyodide.js');
+    const txt = await (await fetch(PY_BASE + 'python_stdlib.b64.txt')).text();
+    const s = atob(txt.replace(/\s+/g, '')); const bin = new Uint8Array(s.length);
+    for (let i = 0; i < s.length; i++) bin[i] = s.charCodeAt(i);
+    const py = await window.loadPyodide({indexURL: PY_BASE, stdLibURL: URL.createObjectURL(new Blob([bin]))});
+    py.runPython(HARNESS);
+    RT.mainRun = py.globals.get('run_job');
+    setRT('ready', {version: py.runPython('import sys; sys.version.split()[0]')});
+  } catch (e){ setRT('failed', {error: String((e && e.message) || e)}); throw e; }
+}
+async function runPy(job, timeoutMs){
+  await RT.ready;
+  const payload = JSON.stringify(job);
+  if (RT.mode === 'main'){ await sleep(30); return JSON.parse(RT.mainRun(payload)); }
+  return new Promise(resolve => {
+    const id = ++RT.seq;
+    const timer = setTimeout(() => {
+      RT.pending.delete(id);
+      try { RT.worker.terminate(); } catch(e){}
+      resolve({compile:{line:null, message:'Watchdog: no answer after ' + Math.round(timeoutMs/1000) + ' s. The interpreter was restarted. Look for a loop that never ends.'}, cases:[]});
+      bootRuntime();
+    }, timeoutMs);
+    RT.pending.set(id, {resolve, timer});
+    RT.worker.postMessage({id, job: payload});
+  });
+}
+
+/* ================= editor ================= */
+let cm = null;
+function makeEditor(host, value, onRun){
+  if (window.CodeMirror){
+    const ed = CodeMirror(host, {
+      value, mode:'python', theme:'eh', lineNumbers:true, indentUnit:4, tabSize:4, indentWithTabs:false,
+      matchBrackets:true, viewportMargin:Infinity,
+      extraKeys:{
+        Tab: c => c.somethingSelected() ? c.indentSelection('add') : c.replaceSelection('    ', 'end'),
+        'Shift-Tab': c => c.indentSelection('subtract'),
+        'Ctrl-Enter': onRun, 'Cmd-Enter': onRun
+      }
+    });
+    let errLine = null;
+    return {
+      getValue: () => ed.getValue(), setValue: v => ed.setValue(v),
+      onChange: f => ed.on('change', f),
+      markError: line => { if (errLine !== null) ed.removeLineClass(errLine, 'background', 'cm-errline'); errLine = null; if (line){ errLine = line - 1; ed.addLineClass(errLine, 'background', 'cm-errline'); } },
+      refresh: () => ed.refresh()
+    };
+  }
+  const ta = document.createElement('textarea'); ta.className = 'fallback'; ta.value = value; ta.spellcheck = false; ta.id = 'codeFallback'; ta.setAttribute('aria-label','Code editor');
+  ta.addEventListener('keydown', e => {
+    if (e.key === 'Tab'){ e.preventDefault(); const s = ta.selectionStart; ta.setRangeText('    ', s, ta.selectionEnd, 'end'); ta.dispatchEvent(new Event('input')); }
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); onRun(); }
+  });
+  host.appendChild(ta);
+  return { getValue: () => ta.value, setValue: v => { ta.value = v; ta.dispatchEvent(new Event('input')); }, onChange: f => ta.addEventListener('input', f), markError: () => {}, refresh: () => {} };
+}
+
+/* ================= communicator ================= */
+const M = (who, time, tx) => ({who, time, tx, unk: who !== 'MERIT'});
+const BEATS = {
+  wake: () => ({msgs:[M('MERIT','06:10','Good morning, 0417! Ship 40 kg of chronite within 72 h to keep your standard O₂ allocation.'), M('MERIT','06:11','Rover R-2 and its cargo are company property. Please recover them.')],
+    replies:[['Acknowledged.', M('MERIT','','Wonderful. Your diligence has been noted.')], ['Who drove R-2?', M('MERIT','','That information is outside the scope of your contract.')]]}),
+  q1wrong: p => ({msgs:[M('MERIT','', 'The tow drone found nothing at ' + p.pt + '. Fuel and window time are billed to you: −600 cr, 2 h.'), M('MERIT','','Please verify your calculations before dispatch.')],
+    replies:[['Recalculating.', M('MERIT','','Thank you, 0417. Accuracy reflects well on your review.')], ['Why am I paying for this?', M('MERIT','','Clause 11.3: equipment use is billed to the operator of record.')]]}),
+  h1: () => ({msgs:[M('MERIT','','R-2 located. A crate manifest will follow recovery.'), M('▒▒ ??:?? ▒▒','','▒▒ don’t let them assay it ▒▒▒')],
+    replies:[['What was that?', M('MERIT','','Relay interference is common near Erebus. Please disregard.')], ['Copy.', M('MERIT','','Thank you, 0417.')]]}),
+  q2: () => ({msgs:[M('MERIT','','Launch fees post automatically. Efficient manifests reflect well on your review.')],
+    replies:[['What if 8 isn’t enough?', M('MERIT','','Unlaunched cargo is reclassified as site waste. Disposal is billed at standard rates.')], ['Understood.', M('MERIT','','Thank you, 0417.')]]}),
+  h2abort: () => ({msgs:[M('MERIT','','Launch interlock engaged. No fuel was spent.'), M('MERIT','','A revised manifest is required before ignition.')],
+    replies:[['Revising.', M('MERIT','','Thank you, 0417.')], ['Who set the 180 kg limit?', M('MERIT','','Pod ratings are proprietary.')]]}),
+  h2: () => ({msgs:[M('0416','▒▒:▒▒','the spectro tables were wiped the morning you woke. the crates are real.'), M('0416','▒▒:▒▒','R-2 kept the raw scans. check them yourself.')],
+    replies:[['Who is this?', M('0416','','the one who drove R-2.')], ['How do I check?', M('0416','','chronite lines come scrambled, never missing. count them.')]]}),
+  q3: () => ({msgs:[M('0416','▒▒:▒▒','if your code says they’re chronite, file a dispute. they have to log it.'), M('MERIT','13:02','Reminder: assay disputes carry a processing fee.')],
+    replies:[['Why help me?', M('0416','','someone should have helped me.')], ['What’s the catch?', M('0416','','their assay box counts every op. brute force runs out of air.')]]}),
+  q3budget: p => ({msgs:[M('0416','▒▒:▒▒', p.n + ' scans ran past the budget. their box stops listening at a million.'), M('0416','▒▒:▒▒','don’t rebuild the window. slide it. one line in, one line out.')],
+    replies:[['Where did it run out?', M('0416','','the long scans. 200,000 lines. that’s where they hid the good crates.')], ['Thanks.', M('0416','','thank me when you’re out.')]]}),
+  q3ready: p => ({msgs:[M('0416','▒▒:▒▒','your code clears ' + p.n + ' of the rejected crates.'), M('MERIT','','Outbound relay opened for dispute filing. Disputes carry a 750 cr processing fee.')],
+    replies:[['File it.', M('0416','','good. now they know you can count.')], ['What if I’m wrong?', M('MERIT','','Incorrect disputes are penalized under clause 22.1.')]]}),
+  end: p => ({msgs:[M('MERIT','','Assay correction logged: ' + p.n + ' crate' + (p.n === 1 ? '' : 's') + ' reclassified as chronite.'), M('MERIT','','A 750 cr dispute processing fee has been applied. Vantage Frontier values your diligence.')],
+    replies:[['You wiped the tables.', M('MERIT','','Records of previous occupancy are unavailable.')], ['Who is 0416?', M('MERIT','','There is no contractor 0416 on file.')]]}),
+  endnone: () => ({msgs:[M('MERIT','','Tender assay accepted as filed. Thank you for your cooperation.')],
+    replies:[['Fine.', M('MERIT','','Vantage Frontier values your independence.')], ['Who is 0416?', M('MERIT','','There is no contractor 0416 on file.')]]}),
+  hook: () => ({msgs:[M('0416','▒▒:▒▒','R-2’s log has one more stop. Outpost 3.'), M('0416','▒▒:▒▒','come find me. bring the rover.')],
+    replies:[['On my way.', M('0416','','keep your O₂ above 30. they bill the refill.')], ['Why should I trust you?', M('0416','','you counted the lines yourself. trust that.')]]})
+};
+let commsShownBeat = null;
+function setBeat(b, params){ S.comms.beat = b; if (params) S.comms.params[b] = params; save(); drawComms(); }
+function drawComms(relayOpen){
+  const host = $('#commsHost'); if (!host) return;
+  const key = S.comms.beat, f = BEATS[key]; if (!f){ host.innerHTML = ''; return; }
+  const beat = f(S.comms.params[key] || {}), pick = S.comms.picks[key];
+  const fresh = commsShownBeat !== key; commsShownBeat = key;
+  const unk = beat.msgs.some(m => m.unk);
+  const msg = (m, i, fr) => `<div class="msg ${m.unk ? 'unk' : ''} ${fr ? 'fresh' : ''}" style="--i:${i}"><span class="who">${esc(m.who)}${m.time ? ' · ' + esc(m.time) : ''}</span><span class="tx">${esc(m.tx)}</span></div>`;
+  let body = beat.msgs.map((m, i) => msg(m, i, fresh)).join('');
+  if (pick !== undefined){ const [lab, resp] = beat.replies[pick]; body += `<div class="msg me">${esc(lab)}</div>` + msg(resp, 0, S.comms.justPicked === key); }
+  S.comms.justPicked = null;
+  const relay = relayOpen === undefined ? (S.stage === 'q3' && S.q3 && S.q3.results && !S.q3.stale) : relayOpen;
+  host.innerHTML = `<section class="comms ${unk ? 'unk' : ''}" aria-label="Communicator">
+    <div class="ch"><span class="dot"></span><span class="ct">COMMS · ${unk ? '▒ UNLISTED' : 'MERIT'}</span></div>
+    <div class="body" aria-live="polite">${body}</div>
+    ${pick === undefined ? `<div class="replies ${fresh ? 'fresh' : ''}" style="--i:${beat.msgs.length}">${beat.replies.map((r, i) => `<button type="button" data-pick="${i}">${esc(r[0])}</button>`).join('')}</div>` : ''}
+    <div class="relay ${relay ? 'open' : ''}">${relay ? '● OUTBOUND RELAY OPEN · DISPUTES ONLY' : '○ OUTBOUND RELAY LOCKED · CLAUSE 9.4'}</div>
+  </section>`;
+  host.querySelectorAll('[data-pick]').forEach(b => b.addEventListener('click', () => { S.comms.picks[key] = +b.dataset.pick; S.comms.justPicked = key; save(); drawComms(relayOpen); }));
+}
+
+/* ================= grid drawing ================= */
+function gridSVG(o){
+  const path = o.path || [], upto = o.upto === undefined ? path.length : o.upto, marks = o.marks || [], dpath = o.dpath || [];
+  const pts = [[0,0]].concat(path, dpath, marks.map(m => m.p));
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  for (const [x, y] of pts){ x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
+  x0 -= 1; x1 += 1; y0 -= 1; y1 += 1;
+  const cols = x1 - x0 + 1, rows = y1 - y0 + 1;
+  const cs = Math.max(3, Math.min(o.maxCell || 34, Math.floor(Math.min(o.maxW / cols, o.maxH / rows))));
+  const W = cols * cs, H = rows * cs, X = x => (x - x0) * cs, Y = y => (y1 - y) * cs;
+  const g = Math.max(1, Math.round(cs * 0.08));
+  const cell = (x, y, cls) => `<rect class="${cls}" x="${X(x) + g}" y="${Y(y) + g}" width="${cs - 2*g}" height="${cs - 2*g}"/>`;
+  const txt = (x, y, t, cls) => cs >= 14 ? `<text class="g-txt ${cls || ''}" x="${X(x) + cs/2}" y="${Y(y) + cs/2 + 3.5}" text-anchor="middle">${t}</text>` : '';
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="${esc(o.label || 'Grid')}">`;
+  if (cols * rows <= 2500){ for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) s += cell(x, y, 'g-cell'); }
+  else s += `<rect x="0" y="0" width="${W}" height="${H}" class="g-cell"/>`;
+  for (let i = 1; i < Math.min(upto, path.length); i++) s += cell(path[i][0], path[i][1], 'g-path');
+  for (const p of dpath) s += cell(p[0], p[1], 'g-dronepath');
+  s += cell(0, 0, 'g-start') + txt(0, 0, 'S');
+  if (cs < 14) s += `<circle class="g-start" cx="${X(0) + cs/2}" cy="${Y(0) + cs/2}" r="6"/><text class="g-txt" x="${X(0) + cs/2 + 10}" y="${Y(0) + cs/2 + 4}">base</text>`;
+  for (const m of marks){
+    s += cell(m.p[0], m.p[1], m.cls);
+    if (cs >= 14){ if (m.t) s += txt(m.p[0], m.p[1], m.t, m.tc); }
+    else { const cx = X(m.p[0]) + cs/2, cy = Y(m.p[1]) + cs/2; s += `<circle class="${m.cls}" cx="${cx}" cy="${cy}" r="7"/>`; if (m.big) s += `<text class="g-txt ${m.tc || ''}" x="${cx + (cx > W/2 ? -11 : 11)}" y="${cy + 4}" text-anchor="${cx > W/2 ? 'end' : 'start'}">${m.big}</text>`; }
+  }
+  if (o.drone) s += `<circle class="g-drone" cx="${X(o.drone[0]) + cs/2}" cy="${Y(o.drone[1]) + cs/2}" r="${Math.max(2, cs * 0.22)}"/>`;
+  return s + '</svg>';
+}
+
+/* ================= screens ================= */
+let tickT = null;
+function go(stage){ S.stage = stage; save(); render(); window.scrollTo({top:0}); }
+function render(){
+  renderChain(); updateTop(); commsShownBeat = null;
+  const scr = $('#screen'); cm = null;
+  ({wake:renderWake, q1:renderProblem, q2:renderProblem, q3:renderProblem, h1:renderH1, h2:renderH2, end:renderEnd})[S.stage](scr);
+}
+function startClock(){
+  clearInterval(tickT);
+  tickT = setInterval(() => { if (document.hidden) return; if (['q1','q2','q3'].includes(S.stage)){ S.min += 1; save(); updateTop(); } }, 2000);
+}
+
+/* ---- wake ---- */
+function renderWake(scr){
+  scr.innerHTML = `<div class="wrap">
+    <article class="card letter accent">
+      <div class="lh">
+        <span class="eyebrow">INBOX · 1 UNREAD</span>
+        <h1>Welcome back online, Contractor 0417</h1>
+        <dl class="meta"><dt>FROM</dt><dd>MERIT · Monitoring, Evaluation &amp; Retention Interface</dd><dt>TO</dt><dd>Contractor #0417 · Lethe Outpost 4</dd><dt>RECEIVED</dt><dd>Day 1 · 06:10 local <span class="cyan">/ Earth ×1.38</span></dd></dl>
+      </div>
+      <div class="lb">
+        <p>Good morning! Your cryo-transit to Lethe completed in 211 days (Earth reference). Transit, berth and onboarding have been added to your account: <span class="mono red">−48,200 cr</span>.</p>
+        <p>Your first shipment is <span class="mono amber">40 kg</span> of chronite within <span class="mono cyan">72 h</span>. Lethe’s proximity to Erebus slows your local clock by <span class="mono cyan">×1.38</span>. Life support is billed on the Earth reference, as per clause 14.2: <span class="mono red">1,104 cr</span> per local day.</p>
+        <p>Rover R-2 and its cargo are company property. Its last position is unknown. Recovering it is your first work order.</p>
+        <p>Your contract concludes when your balance is positive.</p>
+        <p class="muted" style="font-style:italic">Vantage Frontier values your independence.</p>
+      </div>
+      <button type="button" class="attach" id="openWO">
+        <span class="mono small muted" style="letter-spacing:.16em">ATTACHED</span>
+        <span class="mono violet">WO-001</span>
+        <span class="grow">Recover rover R-2</span>
+        <span class="mono small amber" style="letter-spacing:.18em">OPEN ›</span>
+      </button>
+      <div class="lr"><label class="label" for="reply0">REPLY</label><input id="reply0" type="text" disabled value="Outbound relay is licensed to Vantage Frontier. Replies disabled, clause 9.4."></div>
+    </article>
+    <aside class="card facts pad stack">
+      <span class="label">CONTRACT #0417</span>
+      <div class="rules">
+        <div><span>BALANCE</span><span class="red">−48,200 cr</span></div>
+        <div><span>SHIPMENT</span><span class="amber">40 kg chronite</span></div>
+        <div><span>WINDOW</span><span class="cyan">72 h</span></div>
+        <div><span>DILATION</span><span class="cyan">×1.38</span></div>
+        <div><span>LIFE SUPPORT</span><span>1,104 cr / local day</span></div>
+        <div><span>WORK ORDERS</span><span>① locate · ② launch · ③ verify</span></div>
+      </div>
+      <p class="blurb small">Each work order is a Python function. Its return value is executed by the outpost, so a wrong answer sends real equipment to the wrong place.</p>
+      <div class="mono small muted" id="rtFact"></div>
+    </aside>
+  </div>`;
+  setRT(RT.status);
+  $('#openWO').addEventListener('click', () => go('q1'));
+}
+
+/* ---- problem screens ---- */
+function chipHTML(c, res){
+  if (!res) return `<span class="chip idle">${esc(c.label)}</span>`;
+  if (res.pass) return `<span class="chip pass">✓ ${esc(c.label)}</span>`;
+  return `<span class="chip fail">✗ ${esc(c.label)}</span>`;
+}
+function renderProblem(scr){
+  const q = S.stage, P = PROB[q];
+  if (q === 'q1' && S.comms.beat !== 'q1wrong') S.comms.beat = 'wake';
+  if (q === 'q2') S.comms.beat = S.comms.beat === 'h2abort' ? 'h2abort' : 'q2';
+  if (q === 'q3' && !['q3','q3budget','q3ready'].includes(S.comms.beat)) S.comms.beat = 'q3';
+  const fromTag = P.from && S.tags[P.from] ? `<span class="fromtag">INPUT from ${PROB[P.from].num} <b>${esc(S.tags[P.from])}</b></span>` : '';
+  scr.innerHTML = `<div class="wrap">
+    <div class="col-l"><section class="card accent pad stack">
+      <span class="eyebrow">${P.num} · ${P.key}</span>
+      <h1 class="q">${esc(P.title)}</h1>
+      <p class="blurb">${esc(P.blurb)}</p>
+      <div class="sigbox">${P.sig}</div>
+      <div class="rules">${P.rules.map(r => `<div><span>${r[0]}</span><span>${r[1]}</span></div>`).join('')}</div>
+      ${fromTag}
+    </section></div>
+    <div class="col-c">
+      <section class="card">
+        <div class="edhead"><span class="file">${P.file}</span><span class="badge" id="draftBadge">DRAFT</span><span class="grow"></span><span class="edstat" id="edStat">Ctrl/⌘+Enter · calibration</span></div>
+        <div id="cm"></div>
+      </section>
+      <section class="card actions">
+        <div class="chips" id="chips"></div>
+        <span class="grow"></span>
+        <button type="button" class="btn" id="runBtn">RUN</button>
+        <button type="button" class="btn primary" id="goBtn">${P.go}</button>
+      </section>
+      <section class="card console" id="console" aria-live="polite"><span class="ln dim">RUN checks the calibration samples. ${esc(P.go.replace(' ›',''))} hands your function to the outpost.</span></section>
+    </div>
+    <div class="col-r"><section class="card viz" id="viz"></section><div id="commsHost"></div></div>
+  </div>`;
+  cm = makeEditor($('#cm'), S.code[q] != null ? S.code[q] : P.starter, runCalibration);
+  cm.onChange(() => { S.code[q] = cm.getValue(); if (q === 'q3' && S.q3 && S.q3.results && !S.q3.stale){ S.q3.stale = true; drawViz(); updateGo(); drawComms(); } save(); });
+  $('#runBtn').addEventListener('click', runCalibration);
+  $('#goBtn').addEventListener('click', () => primaryAction());
+  drawChips(); drawViz(); drawComms(); updateGo();
+  if (q === 'q3') genScans();
+  if (q === 'q1' && S.h1 && S.h1.lastWrong) con([{c:'warn', t:'Last dispatch: the drone found nothing at ' + S.h1.lastWrong + '. Check the log rules again.'}]);
+  if (q === 'q3' && S.q3 && S.q3.results) assayConsole();
+}
+function drawChips(){
+  const q = S.stage, P = PROB[q], st = S.calib[q] || {};
+  $('#chips').innerHTML = P.calib.map(c => chipHTML(c, st[c.id])).join('') + `<span class="chip">${esc(P.storyLabel)}</span>`;
+}
+function updateGo(){
+  const b = $('#goBtn'); if (!b) return;
+  if (S.stage === 'q3'){
+    const ready = S.q3 && S.q3.results && !S.q3.stale;
+    if (ready){ const d = disputeSet(); b.textContent = d.length ? 'FILE DISPUTE ›' : 'ACCEPT TENDER ASSAY ›'; $('#runBtn').textContent = 'RUN'; }
+    else b.textContent = 'RUN ASSAY ›';
+    const extra = $('#rerunBtn');
+    if (ready && !extra){ const r = document.createElement('button'); r.type = 'button'; r.className = 'btn'; r.id = 'rerunBtn'; r.textContent = 'RE-RUN ASSAY'; r.addEventListener('click', () => runAssay()); b.before(r); }
+    if (!ready && extra) extra.remove();
+  }
+}
+function setBusy(on, txt){
+  ['#runBtn','#goBtn','#rerunBtn'].forEach(s => { const b = $(s); if (b) b.disabled = on; });
+  const st = $('#edStat'); if (st) st.textContent = on ? txt : 'Ctrl/⌘+Enter · calibration';
+}
+function con(lines){ const c = $('#console'); if (!c) return; c.innerHTML = lines.map(l => `<span class="ln ${l.c || ''}">${l.h || esc(l.t)}</span>`).join(''); }
+function argText(a){
+  if (typeof a === 'string') return a.length > 24 ? `<${fmtN(a.length)}-char string>` : JSON.stringify(a);
+  if (Array.isArray(a)) return a.length > 10 ? `[${a.slice(0,6).join(', ')}, … ${a.length} items]` : '[' + a.join(', ') + ']';
+  return String(a);
+}
+function valText(kind, r){
+  if (r.status === 'budget') return 'over budget';
+  if (r.status === 'error') return 'error';
+  if (r.value === null || r.value === undefined) return r.repr + ' (not a ' + ({point:'pair of ints', int:'int', bool:'bool'})[kind] + ')';
+  if (kind === 'point') return fmtPt(r.value);
+  if (kind === 'bool') return r.value ? 'True' : 'False';
+  return String(r.value);
+}
+const expText = (kind, v) => kind === 'point' ? fmtPt(v) : kind === 'bool' ? (v ? 'True' : 'False') : String(v);
+const same = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+function errLines(e){ cm && cm.markError(e.line); return [{c:'bad', t:(e.line ? 'line ' + e.line + ' · ' : '') + e.message}]; }
+async function waitRT(){
+  if (RT.status === 'failed'){ con([{c:'bad', t:'The Python interpreter could not start: ' + RT.error}, {c:'dim', t:'Reload the page to try again.'}]); return false; }
+  if (RT.status !== 'ready'){ setBusy(true, 'waiting for Python…'); con([{c:'warn', t:'Waiting for the Python interpreter to finish loading…'}]); }
+  try { await RT.ready; } catch(e){ setBusy(false); con([{c:'bad', t:'The Python interpreter could not start: ' + RT.error}]); return false; }
+  return true;
+}
+async function runCalibration(){
+  const q = S.stage, P = PROB[q]; if (!P || $('#runBtn').disabled) return;
+  if (!(await waitRT())) return;
+  setBusy(true, 'running calibration…'); cm.markError(null);
+  const job = {code: cm.getValue(), fn:P.fn, kind:P.kind, filename:'<' + P.file + '>', cases:P.calib.map(c => ({id:c.id, args:c.args, budget: q === 'q3' ? BUDGET : WATCHDOG}))};
+  const r = await runPy(job, 20000);
+  setBusy(false);
+  const lines = [{c:'hd', t:'CALIBRATION · ' + new Date().toTimeString().slice(0,8)}];
+  if (r.compile){ con(lines.concat(errLines(r.compile))); return; }
+  S.calib[q] = {};
+  for (const c of P.calib){
+    const res = r.cases.find(x => x.id === c.id);
+    const pass = res.status === 'ok' && same(res.value, c.expect);
+    S.calib[q][c.id] = {pass, value: res.value};
+    lines.push({c: pass ? 'ok' : 'bad', t:(pass ? '✓ ' : '✗ ') + P.fn + '(' + c.args.map(argText).join(', ') + ') → ' + valText(P.kind, res) + (pass ? '' : ' · expected ' + expText(P.kind, c.expect)) + ' · ' + fmtN(res.ops) + ' ops'});
+    if (res.status === 'error'){ lines.push(...errLines(res.error)); }
+    if (res.status === 'budget') lines.push({c:'warn', t:'  ran past ' + fmtN(q === 'q3' ? BUDGET : WATCHDOG) + ' ops'});
+    if (res.stdout) lines.push({c:'out', t: res.stdout.trimEnd().split('\n').map(s => '  │ ' + s).join('\n')});
+  }
+  save(); con(lines); drawChips(); drawViz();
+}
+function primaryAction(){
+  if (S.stage === 'q1') return dispatchQ1();
+  if (S.stage === 'q2') return submitQ2();
+  if (S.stage === 'q3'){ if (S.q3 && S.q3.results && !S.q3.stale) return fileDispute(); return runAssay(); }
+}
+async function runHidden(P, extraCases, timeout){
+  if (!(await waitRT())) return null;
+  setBusy(true, 'handing code to the outpost…'); cm.markError(null);
+  const cases = P.hidden.map(c => ({id:c.id, args:c.args, budget:WATCHDOG})).concat(extraCases);
+  const r = await runPy({code: cm.getValue(), fn:P.fn, kind:P.kind, filename:'<' + P.file + '>', cases}, timeout);
+  setBusy(false);
+  return r;
+}
+function fieldList(P, r){ return P.hidden.map(c => { const x = r.cases.find(y => y.id === c.id); return {label:c.label, pass: x.status === 'ok' && same(x.value, c.expect), got: valText(P.kind, x)}; }); }
+async function dispatchQ1(){
+  const P = PROB.q1, st = P.story();
+  const r = await runHidden(P, [{id:'story', args:st.args, budget:WATCHDOG}], 20000); if (!r) return;
+  if (r.compile){ con([{c:'hd', t:'DISPATCH HELD'}].concat(errLines(r.compile))); return; }
+  const s = r.cases.find(c => c.id === 'story');
+  if (s.status !== 'ok' || !s.value){
+    const lines = [{c:'hd', t:'DISPATCH HELD · the drone needs a coordinate'}, {c:'bad', t:'locate_rover(<R-2 log>, 14) → ' + valText('point', s)}];
+    if (s.status === 'error') lines.push(...errLines(s.error));
+    con(lines); return;
+  }
+  S.stats.dispatches++;
+  S.h1 = {pt: s.value, field: fieldList(P, r), state:'ready', ops:s.ops};
+  go('h1');
+}
+async function submitQ2(){
+  const P = PROB.q2, st = P.story();
+  const r = await runHidden(P, [{id:'story', args:st.args, budget:WATCHDOG}], 20000); if (!r) return;
+  if (r.compile){ con([{c:'hd', t:'MANIFEST REJECTED'}].concat(errLines(r.compile))); return; }
+  const s = r.cases.find(c => c.id === 'story');
+  if (s.status !== 'ok' || s.value === null){
+    const lines = [{c:'hd', t:'MANIFEST REJECTED · the rail needs a pod count'}, {c:'bad', t:'min_launches(<14 crates>, 180) → ' + valText('int', s)}];
+    if (s.status === 'error') lines.push(...errLines(s.error));
+    con(lines); return;
+  }
+  S.h2 = {n: s.value, field: fieldList(P, r), state:'ready'};
+  go('h2');
+}
+
+/* ---- viz per problem ---- */
+function drawViz(){ const v = $('#viz'); if (!v) return; v.innerHTML = ({q1:vizQ1, q2:vizQ2, q3:vizQ3})[S.stage](); bindViz(); }
+function vizQ1(){
+  const P = PROB.q1, sel = P.calib.find(c => c.id === S.ui.q1sel) || P.calib[0];
+  const sim = simRover(sel.args[0], sel.args[1]);
+  const got = (S.calib.q1[sel.id] || {}).value;
+  const marks = [{p:sim.end, cls:'g-stop', t:'■', tc:'a'}];
+  if (got && !same(got, sim.end)) marks.push({p:got, cls:'g-you', t:'you', tc:'v'});
+  const head = R2_LOG.slice(0, 17), tail = R2_LOG.slice(17, 64);
+  return `<div class="cardhead"><span class="label">REPLAY</span><span class="mono small muted">${esc(sel.label)}</span></div>
+    <div class="segs">${P.calib.map(c => `<button type="button" class="seg" data-sel="${c.id}" aria-pressed="${c.id === sel.id}">${esc(c.label)}</button>`).join('')}</div>
+    <div class="gridwrap">${gridSVG({path:sim.path, marks, maxW:300, maxH:200, maxCell:30, label:'Calibration replay'})}</div>
+    <span class="mono small muted">stopped at <span class="amber">${fmtPt(sim.end)}</span> · ${sim.ignored} command${sim.ignored === 1 ? '' : 's'} ignored${got ? (same(got, sim.end) ? ' · <span class="green">yours matches</span>' : ' · <span class="violet">yours: ' + fmtPt(got) + '</span>') : ''}</span>
+    <div class="cardhead" style="margin-top:6px"><span class="label">R-2 LOG</span><span class="mono small muted">3,412 cmds · battery 14</span></div>
+    <div class="logtape">${head}${tail}… <span class="muted">+${fmtN(R2_LOG.length - 64)}</span></div>`;
+}
+function vizQ2(){
+  const sorted = CRATE_KG.slice().sort((a, b) => a - b);
+  return `<div class="cardhead"><span class="label">INPUT</span><span class="mono small muted">from ① · ${esc(S.tags.q1 || '(7, −3)')}</span></div>
+    <div class="crates">${sorted.map((w, i) => `<div class="crate ${i === 0 ? 'i' : i === sorted.length - 1 ? 'j' : ''}"><small>${i === 0 ? 'i' : i === sorted.length - 1 ? 'j' : ''}</small>${w}</div>`).join('')}</div>
+    <span class="mono small muted">14 crates · 1,275 kg · sorted · limit 180 kg</span>
+    <div class="rules">
+      <div><span>RECOVERED ORDER</span><span>${CRATE_KG.join(', ')}</span></div>
+      <div><span>FUEL ON RAIL</span><span class="amber">8 burns · 9,600 cr</span></div>
+    </div>`;
+}
+function grounded(){ return (S.h2 && S.h2.grounded) || []; }
+function vizQ3(){
+  const sc = genScans(); const res = S.q3 && S.q3.results; const stale = S.q3 && S.q3.stale; const gr = grounded();
+  const rows = CRATES.map(c => {
+    const isG = gr.includes(c.id); const r = res && res[c.id];
+    let you = '<span class="yr na">—</span>', bar = '';
+    if (isG) you = '<span class="yr na">grounded</span>';
+    else if (r){
+      if (r.status === 'budget') you = '<span class="yr ob">unverified</span>';
+      else if (r.status === 'error') you = '<span class="yr er">error</span>';
+      else if (r.value === true) you = '<span class="yr ch">chronite</span>';
+      else if (r.value === false) you = '<span class="yr sl">slag</span>';
+      else you = '<span class="yr er">bad type</span>';
+      const pct = Math.min(100, r.ops / BUDGET * 100);
+      bar = `<span class="opsbar ${r.status === 'budget' ? 'over' : ''}" title="${fmtN(r.ops)} ops"><i style="width:${pct.toFixed(1)}%"></i></span>`;
+    }
+    const tv = isG ? '<span class="tv gr">GROUND</span>' : c.tender === 'OK' ? '<span class="tv ok">OK</span>' : '<span class="tv slag">SLAG</span>';
+    return `<tr><td>${c.id}</td><td>${tv}</td><td class="num">${fmtN(sc.scans[c.id].len)}</td><td style="${stale ? 'opacity:.45' : ''}">${you}</td><td>${bar}</td></tr>`;
+  }).join('');
+  let summary = '<span class="mono small muted">RUN ASSAY scores all 14 scans against the signature.</span>';
+  if (res){
+    const d = disputeSet(); const t10 = d.reduce((a, c) => a + c.y10, 0); const ob = CRATES.filter(c => res[c.id] && res[c.id].status === 'budget').length;
+    summary = stale ? '<span class="mono small warn amber">Code changed since the last assay. Run it again before filing.</span>'
+      : `<span class="mono small">Dispute would cover <span class="amber">${d.length} crate${d.length === 1 ? '' : 's'}</span>${ob ? ` · <span class="amber">${ob} unverified</span>` : ''} · fee 750 cr</span>`;
+  }
+  return `<div class="cardhead"><span class="label">INPUT</span><span class="mono small muted">from ② · tender assay</span></div>
+    <div class="rules"><div><span>SIGNATURE</span><span>${fmtN(sc.sig.length)} lines · 14 distinct</span></div></div>
+    <div class="tablewrap"><table class="ct"><thead><tr><th>CRATE</th><th>TENDER</th><th class="num">SCAN</th><th>YOURS</th><th>OPS</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${summary}`;
+}
+function bindViz(){ document.querySelectorAll('[data-sel]').forEach(b => b.addEventListener('click', () => { S.ui.q1sel = b.dataset.sel; save(); drawViz(); })); }
+
+/* ---- ③ assay ---- */
+function disputeSet(){
+  const res = S.q3 && S.q3.results; if (!res) return [];
+  const gr = grounded();
+  return CRATES.filter(c => c.tender === 'SLAG' && !gr.includes(c.id) && res[c.id] && res[c.id].status === 'ok' && res[c.id].value === true);
+}
+async function runAssay(){
+  const P = PROB.q3, sc = genScans(), gr = grounded();
+  const cases = CRATES.filter(c => !gr.includes(c.id)).map(c => ({id:c.id, args:[sc.scans[c.id].text, sc.sig], budget:BUDGET}));
+  con([{c:'warn', t:'Assaying ' + cases.length + ' raw scans from R-2…'}]);
+  const r = await runHidden(P, cases, 90000); if (!r) return;
+  if (r.compile){ con([{c:'hd', t:'ASSAY HALTED'}].concat(errLines(r.compile))); return; }
+  const results = {};
+  for (const c of CRATES){ const x = r.cases.find(y => y.id === c.id); if (x) results[c.id] = {status:x.status, value:x.value, ops:x.ops, ms:x.ms, error:x.error}; }
+  S.q3 = {results, stale:false, field: fieldList(P, r)};
+  S.stats.maxOps = Math.max(0, ...Object.values(results).filter(x => x.status === 'ok').map(x => x.ops));
+  advance(10);
+  const ob = Object.values(results).filter(x => x.status === 'budget').length;
+  if (ob) setBeat('q3budget', {n: ob}); else setBeat('q3ready', {n: disputeSet().length});
+  assayConsole(); drawViz(); updateGo(); drawComms();
+}
+function assayConsole(){
+  const P = PROB.q3, q = S.q3, res = q.results;
+  const lines = [{c:'hd', t:'FIELD ASSAY · R-2 RAW SCANS'}];
+  for (const f of q.field) lines.push({c: f.pass ? 'ok' : 'bad', t:(f.pass ? '✓ ' : '✗ ') + 'field check ' + f.label + ' → ' + f.got});
+  for (const c of CRATES){
+    const x = res[c.id]; if (!x) continue;
+    const t = c.id + ' · ' + (x.status === 'budget' ? 'ran past 1,000,000 ops · unverified' : x.status === 'error' ? 'error' : (x.value === true ? 'chronite' : x.value === false ? 'slag' : 'not a bool')) + ' · ' + fmtN(x.ops) + ' ops';
+    lines.push({c: x.status === 'budget' ? 'warn' : x.status === 'error' ? 'bad' : 'dim', t});
+    if (x.status === 'error' && x.error) lines.push(...errLines(x.error));
+  }
+  con(lines);
+}
+function fileDispute(){
+  const d = disputeSet(); const res = S.q3.results;
+  let good10 = 0, fines = 0; const rows = [];
+  for (const c of d){ if (c.y10 > 0){ good10 += c.y10; rows.push({id:c.id, ok:true, y10:c.y10}); } else { fines += 2000; rows.push({id:c.id, ok:false}); } }
+  const credit = Math.round(good10 * RATE / 10);
+  const chronCount = CRATES.filter(c => res[c.id] && res[c.id].status === 'ok' && res[c.id].value === true).length;
+  advance(45);
+  if (d.length){
+    if (credit) post('Assay correction · ' + rows.filter(r => r.ok).length + ' crates · ' + kg(good10) + ' kg', credit);
+    post('Dispute processing fee', -750);
+    if (fines) post('Clause 22.1 · incorrect dispute', -fines);
+  }
+  S.end = {rows, good10, credit, fines, filed: d.length > 0, accepted10: S.h2.accepted10, chronCount};
+  setTag('q3', chronCount + ' / 14');
+  S.comms.beat = d.length ? 'end' : 'endnone'; S.comms.params[S.comms.beat] = {n: rows.filter(r => r.ok).length};
+  go('end');
+}
+
+/* ---- ① → ② transition ---- */
+function renderH1(scr){
+  const h = S.h1, right = same(h.pt, R2_SIM.end);
+  if (h.state === 'found') S.comms.beat = 'h1';
+  scr.innerHTML = `<div class="wrap">
+    <section class="card stage">
+      <div class="cardhead"><span class="label">TOW DRONE · ${right || h.state === 'ready' ? 'REPLAYING R-2 LOG' : 'FLIGHT LOG'}</span><span class="mono small muted" id="h1prog"></span></div>
+      <div class="gridwrap" id="h1grid"></div>
+      <span class="mono small muted" id="h1note">Standing by at base (0, 0).</span>
+    </section>
+    <div class="side">
+      <section class="card accent-g pad stack">
+        <span class="eyebrow green">① RESULT</span>
+        <div class="mono small muted">locate_rover(&lt;R-2 log&gt;, 14) →</div>
+        <div class="bignum">${fmtPt(h.pt)}</div>
+        <div class="field">${h.field.map(f => `<div><span class="${f.pass ? 'green' : 'red'}">${f.pass ? '✓' : '✗'} field check ${esc(f.label)}</span><span class="muted">${esc(f.got)}</span></div>`).join('')}</div>
+        <div style="display:flex;align-items:center;gap:14px;border-top:1px solid var(--line);padding-top:14px">
+          <button type="button" class="toggle" id="dispatch" aria-pressed="${h.state !== 'ready'}" aria-label="Dispatch tow drone" ${h.state !== 'ready' ? 'disabled' : ''}><span></span></button>
+          <div style="display:flex;flex-direction:column;gap:2px"><span>Dispatch tow drone</span><span class="mono small muted" id="tglLbl">${h.state === 'ready' ? 'STANDBY · flip to send' : h.state === 'found' ? 'ARRIVED' : 'RETURNING'}</span></div>
+        </div>
+      </section>
+      <div id="h1out"></div>
+      <div id="commsHost"></div>
+    </div>
+  </div>`;
+  const grid = $('#h1grid');
+  const showStatic = () => {
+    if (h.state === 'found'){ grid.innerHTML = gridSVG({path:R2_SIM.path, marks:[{p:R2_SIM.end, cls:'g-found', t:'R-2', tc:'a'}], maxW:640, maxH:400, maxCell:44, label:'R-2 route'}); $('#h1prog').textContent = '14 / 14 cells'; $('#h1note').innerHTML = noteFound(); h1Out(true); }
+    else if (h.state === 'empty'){ grid.innerHTML = gridSVG({dpath:dronePath(h.pt), marks:[{p:h.pt, cls:'g-empty', t:'∅', tc:'r', big:'∅ ' + fmtPt(h.pt)}], maxW:640, maxH:400, maxCell:44, label:'Drone route'}); $('#h1note').innerHTML = noteEmpty(h.pt); h1Out(false); }
+    else grid.innerHTML = gridSVG({marks:[{p:h.pt, cls:'g-you', t:'?', tc:'v', big:'? ' + fmtPt(h.pt)}], maxW:640, maxH:400, maxCell:44, label:'Target'});
+  };
+  showStatic(); drawComms();
+  const btn = $('#dispatch');
+  btn.addEventListener('click', async () => {
+    if (h.state !== 'ready' || btn.dataset.busy) return;
+    btn.dataset.busy = '1'; btn.setAttribute('aria-pressed', 'true'); $('#tglLbl').textContent = 'EN ROUTE';
+    if (right){
+      const n = R2_SIM.path.length;
+      for (let i = 1; i <= n; i++){
+        grid.innerHTML = gridSVG({path:R2_SIM.path, upto:i, drone:R2_SIM.path[i - 1], marks: i === n ? [{p:R2_SIM.end, cls:'g-found', t:'R-2', tc:'a'}] : [], maxW:640, maxH:400, maxCell:44, label:'R-2 route replay'});
+        $('#h1prog').textContent = (i - 1) + ' / 14 cells';
+        await sleep(stepMs(160));
+      }
+      grid.innerHTML = gridSVG({path:R2_SIM.path, marks:[{p:R2_SIM.end, cls:'g-found', t:'R-2', tc:'a'}], maxW:640, maxH:400, maxCell:44, label:'R-2 route'});
+      h.state = 'found'; advance(200); setTag('q1', fmtPt(h.pt)); S.comms.beat = 'h1'; save();
+      $('#tglLbl').textContent = 'ARRIVED'; $('#h1note').innerHTML = noteFound(); h1Out(true); drawComms();
+    } else {
+      const dp = dronePath(h.pt); const stride = Math.max(1, Math.ceil(dp.length / 45));
+      for (let i = 0; i <= dp.length; i += stride){
+        grid.innerHTML = gridSVG({dpath:dp.slice(0, i), drone: dp[Math.max(0, i - 1)] || [0,0], marks:[{p:h.pt, cls:'g-you', t:'?', tc:'v', big:'? ' + fmtPt(h.pt)}], maxW:640, maxH:400, maxCell:44, label:'Drone route'});
+        $('#h1prog').textContent = 'flying to ' + fmtPt(h.pt);
+        await sleep(stepMs(120));
+      }
+      grid.innerHTML = gridSVG({dpath:dp, marks:[{p:h.pt, cls:'g-empty', t:'∅', tc:'r', big:'∅ ' + fmtPt(h.pt)}], maxW:640, maxH:400, maxCell:44, label:'Drone route'});
+      h.state = 'empty'; S.stats.wrong++; advance(120); post('Tow drone fuel · empty run to ' + fmtPt(h.pt), -600);
+      setBeat('q1wrong', {pt: fmtPt(h.pt)});
+      $('#tglLbl').textContent = 'RETURNING'; $('#h1note').innerHTML = noteEmpty(h.pt); h1Out(false); drawComms();
+    }
+  });
+}
+function dronePath(pt){
+  const out = []; let x = 0, y = 0;
+  while (x !== pt[0]){ x += Math.sign(pt[0] - x); out.push([x, y]); }
+  while (y !== pt[1]){ y += Math.sign(pt[1] - y); out.push([x, y]); }
+  return out;
+}
+const noteFound = () => `R-2 kept receiving orders for 9 days after its battery died. <span class="amber">${fmtN(R2_SIM.ignored)} commands ignored.</span>`;
+const noteEmpty = pt => `<span class="red">No rover at ${fmtPt(pt)}.</span> The drone burned fuel for nothing and is flying home. R-2 is still out there.`;
+function h1Out(found){
+  const o = $('#h1out');
+  if (found){
+    o.innerHTML = `<section class="card accent-a pad stack">
+      <span class="label">RECOVERED · 14 CRATES (kg)</span>
+      <div class="crates">${CRATES.map((c, i) => `<div class="crate rise-in" style="animation-delay:${stepMs(i * 70)}ms"><small>${c.id}</small>${c.w}</div>`).join('')}</div>
+      <div class="mono small muted">becomes input of <span class="violet">② LAUNCH</span></div>
+      <button type="button" class="btn primary" id="toQ2" style="align-self:flex-end">CONTINUE ›</button>
+    </section>`;
+    $('#toQ2').addEventListener('click', () => { S.comms.beat = 'q2'; go('q2'); });
+  } else {
+    o.innerHTML = `<section class="card accent-r pad stack">
+      <span class="label">EMPTY RUN</span>
+      <div class="kv"><span>drone fuel</span><span class="red">−600 cr</span><span>window</span><span class="cyan">−2 h</span></div>
+      <button type="button" class="btn" id="backQ1" style="align-self:flex-end">BACK TO THE LOG ›</button>
+    </section>`;
+    $('#backQ1').addEventListener('click', () => { const pt = fmtPt(S.h1.pt); S.h1 = {lastWrong: pt}; go('q1'); });
+  }
+}
+
+/* ---- ② → ③ transition ---- */
+function renderH2(scr){
+  const h = S.h2, n = h.n;
+  const valid = n >= FUEL && n <= 14;
+  const nPods = Math.max(0, Math.min(n, 16));
+  if (h.state === 'assayed') S.comms.beat = 'h2';
+  if (h.state === 'aborted') S.comms.beat = 'h2abort';
+  scr.innerHTML = `<div class="wrap">
+    <div class="stage" style="padding:0;gap:20px">
+      <section class="card pad stack">
+        <div class="cardhead"><span class="label">LAUNCH RAIL</span><span class="mono small muted">min_launches(…) → <span class="amber">${n}</span>${n === FUEL ? ' · fuel exactly spent' : ''}</span></div>
+        <div class="pods" id="pods"></div>
+        <span class="mono small muted" id="railNote">${n > 16 ? 'Showing the first 16 of ' + n + ' pods. ' : ''}${FUEL} burns of fuel loaded · ${fmtN(LAUNCH_FEE)} cr per launch.</span>
+        <button type="button" class="btn ${h.state === 'ready' ? 'primary' : 'ghost-g'}" id="launch" style="align-self:flex-start" ${h.state !== 'ready' ? 'disabled' : ''}>${h.state === 'ready' ? 'LAUNCH ' + n + ' POD' + (n === 1 ? '' : 'S') : 'RAIL CLEARED'}</button>
+      </section>
+      <div id="h2out"></div>
+    </div>
+    <div class="side">
+      <section class="card accent-g pad stack">
+        <span class="eyebrow green">② RESULT</span>
+        <div class="bignum">${n} pod${n === 1 ? '' : 's'}</div>
+        <div class="field">${h.field.map(f => `<div><span class="${f.pass ? 'green' : 'red'}">${f.pass ? '✓' : '✗'} field check ${esc(f.label)}</span><span class="muted">${esc(f.got)}</span></div>`).join('')}</div>
+      </section>
+      <div id="commsHost"></div>
+    </div>
+  </div>`;
+  const pods = $('#pods');
+  const drawPods = (lit, status) => { pods.innerHTML = Array.from({length:nPods}, (_, i) => {
+    let cls = '', t = String(i + 1), sub = 'POD';
+    if (i < lit){ if (i < FUEL && (status !== 'abort')){ cls = 'lit'; t = '<b>▲</b>'; sub = 'AWAY'; } else if (status === 'abort'){ cls = 'nofuel'; t = '!'; sub = 'LOCKED'; } else { cls = 'nofuel'; t = '✕'; sub = 'NO FUEL'; } }
+    else if (status === 'armed') cls = 'armed';
+    return `<div class="pod ${cls}">${t}<small>${sub}</small></div>`; }).join(''); };
+  if (h.state === 'ready') drawPods(0, 'armed');
+  else if (h.state === 'aborted') drawPods(nPods, 'abort');
+  else drawPods(nPods, 'done');
+  if (h.state === 'assayed') h2Assay(false);
+  if (h.state === 'aborted') h2Abort();
+  drawComms();
+  $('#launch').addEventListener('click', async () => {
+    const b = $('#launch'); if (b.disabled) return; b.disabled = true; b.textContent = 'IGNITION…';
+    if (!valid){
+      for (let i = 1; i <= nPods; i++){ drawPods(i, 'armed'); await sleep(stepMs(120)); }
+      drawPods(nPods, 'abort'); h.state = 'aborted'; advance(60); setBeat('h2abort'); b.textContent = 'INTERLOCK'; h2Abort(); return;
+    }
+    for (let i = 1; i <= nPods; i++){ drawPods(i, 'done'); b.textContent = 'LAUNCHING ' + Math.min(i, FUEL) + ' / ' + FUEL; await sleep(stepMs(i <= FUEL ? 320 : 200)); }
+    const extra = Math.min(n - FUEL, POD_PLAN.length - 1);
+    const groundedIds = extra > 0 ? POD_PLAN.slice(POD_PLAN.length - extra).flat() : [];
+    const launched = CRATES.filter(c => !groundedIds.includes(c.id));
+    const acc10 = launched.filter(c => c.tender === 'OK').reduce((a, c) => a + c.y10, 0);
+    h.grounded = groundedIds; h.accepted10 = acc10; h.state = 'assayed';
+    advance(240);
+    post('Launch fees · ' + FUEL + ' burns', -FUEL * LAUNCH_FEE);
+    if (acc10) post('Tender assay · ' + kg(acc10) + ' kg accepted', Math.round(acc10 * RATE / 10));
+    post('Life support · local day 1 (1.38 Earth days)', -1104);
+    if (groundedIds.length) post('Site waste disposal · ' + groundedIds.length + ' grounded crates', -400 * groundedIds.length);
+    setTag('q2', groundedIds.length ? FUEL + ' / ' + n + ' pods' : FUEL + ' pods');
+    b.textContent = FUEL + ' / ' + FUEL + ' LAUNCHED'; b.className = 'btn ghost-g';
+    S.comms.beat = 'h2'; save();
+    h2Assay(true); drawComms();
+  });
+}
+function h2Assay(animate){
+  const h = S.h2, gr = h.grounded || [];
+  const launched = CRATES.filter(c => !gr.includes(c.id));
+  const rej = launched.filter(c => c.tender === 'SLAG').length;
+  $('#h2out').innerHTML = `<section class="card accent-r pad stack ${animate ? 'fresh' : ''}">
+    <div class="cardhead"><span class="label">TENDER ASSAY · VANTAGE FRONTIER</span><span class="mono small muted">auto-posted</span></div>
+    <div class="assayhead"><b>${rej} / ${launched.length}</b><span>crates rejected as slag</span></div>
+    <div class="crates">${CRATES.map(c => { const g = gr.includes(c.id); return `<div class="crate" style="border-color:${g ? 'var(--line)' : c.tender === 'OK' ? 'var(--green-line)' : '#5a2f38'};${g ? 'border-style:dashed;' : ''}"><small>${c.id}</small><span class="${g ? 'muted' : c.tender === 'OK' ? 'green' : 'red'}">${g ? 'GND' : c.tender}</span></div>`; }).join('')}</div>
+    <div class="kv">
+      <span>credited</span><span class="green">${kg(h.accepted10)} kg · ${fmtAmt(Math.round(h.accepted10 * RATE / 10))}</span>
+      <span>launch fees</span><span class="red">−${fmtN(FUEL * LAUNCH_FEE)}</span>
+      <span>life support · local day 1</span><span class="red">−1,104</span>
+      ${gr.length ? `<span>disposal · ${gr.length} grounded</span><span class="red">−${fmtN(400 * gr.length)}</span>` : ''}
+      <span>quota</span><span class="amber">${kg(h.accepted10)} / 40 kg</span>
+      <span>balance</span><span class="red">${fmtBal(balance())}</span>
+    </div>
+    ${gr.length ? `<span class="mono small red">Grounded: ${gr.join(', ')}. MERIT reclassified them as site waste. They can’t be assayed or disputed.</span>` : ''}
+    <button type="button" class="btn primary" id="toQ3" style="align-self:flex-end">③ VERIFY THE SCANS ›</button>
+  </section>`;
+  $('#toQ3').addEventListener('click', () => { S.comms.beat = 'q3'; go('q3'); });
+}
+function h2Abort(){
+  const n = S.h2.n;
+  const why = n > 14 ? `Your manifest asks for ${n} pods for 14 crates. The rail refuses to fire empty pods.` : n < 1 ? `A manifest of ${n} pods can’t carry 14 crates.` : `Your manifest packs 14 crates into ${n} pod${n === 1 ? '' : 's'}. At least one pod would carry more than 180 kg or more than 2 crates.`;
+  $('#h2out').innerHTML = `<section class="card accent-r pad stack">
+    <span class="label">LAUNCH INTERLOCK</span>
+    <p class="blurb">${esc(why)} No fuel was spent.</p>
+    <div class="kv"><span>window</span><span class="cyan">−1 h</span></div>
+    <button type="button" class="btn" id="backQ2" style="align-self:flex-end">REVISE MANIFEST ›</button>
+  </section>`;
+  $('#backQ2').addEventListener('click', () => { S.h2 = null; S.comms.beat = 'h2abort'; go('q2'); });
+}
+
+/* ---- ending ---- */
+function renderEnd(scr){
+  const e = S.end; const total10 = (e.accepted10 || 0) + e.good10; const met = total10 >= QUOTA10;
+  const pct = Math.min(100, total10 / QUOTA10 * 100);
+  const bal = balance();
+  scr.innerHTML = `<div class="wrap">
+    <div class="stage" style="padding:0;gap:20px">
+      <section class="card ${e.filed ? 'accent-g' : ''} pad stack">
+        <div class="cardhead"><span class="label">${e.filed ? 'ASSAY CORRECTION · VANTAGE FRONTIER' : 'TENDER ASSAY · ACCEPTED AS FILED'}</span><span class="mono small muted">dispute ${e.filed ? 'logged' : 'not filed'}</span></div>
+        ${e.filed ? `<div class="crates">${e.rows.map(r => `<div class="crate" style="border-color:${r.ok ? 'var(--green-line)' : '#5a2f38'}"><small>${r.id}</small><span class="${r.ok ? 'green' : 'red'}">${r.ok ? kg(r.y10) + ' kg' : 'DENIED'}</span></div>`).join('')}</div>` : ''}
+        <div class="kv">
+          ${e.filed ? `<span>reclassified as chronite</span><span class="green">${e.rows.filter(r => r.ok).length} crates · ${kg(e.good10)} kg</span>
+          <span>correction credit</span><span class="green">${fmtAmt(e.credit)}</span>
+          <span>dispute processing fee</span><span class="red">−750</span>` : ''}
+          ${e.fines ? `<span>clause 22.1 · incorrect dispute</span><span class="red">−${fmtN(e.fines)}</span>` : ''}
+          <span>balance</span><span class="${bal < 0 ? 'red' : 'green'}">${fmtBal(bal)}</span>
+        </div>
+        <div class="cardhead"><span class="mono small muted">SHIPMENT</span><span class="mono small ${met ? 'green' : 'amber'}">${kg(total10)} / 40 kg${met ? ' · quota met' : ' · short'}</span></div>
+        <div class="quota ${met ? 'met' : ''}"><i style="width:${pct}%"></i><em style="left:100%"></em></div>
+      </section>
+      <section class="card pad stack">
+        <div class="cardhead"><span class="label">R-2 LOG · TAIL</span><span class="mono small muted">raw, unsigned</span></div>
+        <div class="tape" id="tape"></div>
+      </section>
+    </div>
+    <div class="side">
+      <section class="card accent pad stack" id="endCard">
+        <span class="eyebrow">CHAPTER 1 · COLD START</span>
+        <h1 class="q">${met ? 'Quota met. You still owe.' : 'Shipment short. You still owe.'}</h1>
+        <p class="blurb">Your contract continues until the balance turns positive. Somewhere past the ridge, Outpost 3 is still drawing power.</p>
+        <div class="rules">
+          <div><span>DISPATCHES</span><span>${S.stats.dispatches}${S.stats.wrong ? ' · ' + S.stats.wrong + ' empty' : ''}</span></div>
+          <div><span>LAUNCH</span><span>${esc(S.tags.q2 || '—')}</span></div>
+          <div><span>SCANS CLEARED</span><span>${esc(S.tags.q3 || '—')}</span></div>
+          <div><span>PEAK ASSAY</span><span>${fmtN(S.stats.maxOps)} ops / 1,000,000</span></div>
+          <div><span>WINDOW LEFT</span><span class="cyan">${clockText()}</span></div>
+          <div><span>BALANCE</span><span class="${bal < 0 ? 'red' : 'green'}">${fmtBal(bal)}</span></div>
+        </div>
+        <span class="mono small muted">Next · Chapter 2 · Outpost 3 (in design)</span>
+        <button type="button" class="btn" id="again" style="align-self:flex-start">REPLAY CHAPTER</button>
+      </section>
+      <div id="commsHost"></div>
+    </div>
+  </div>`;
+  drawComms(e.filed);
+  $('#again').addEventListener('click', restart);
+  const lines = [
+    '0x0D41  CMD   F  ignored · battery 0',
+    '0x0D42  CMD   R  ignored · battery 0',
+    '0x0D47  SCAN  raw spectra archived · 14 / 14',
+    '0x0D4C  NOTE  operator 0416 · “they’ll wipe the tables”',
+    '0x0D51  CMD   F  ignored · battery 0',
+    '<span class="hl">0x0D52  WAYPOINT  OUTPOST 3  (−212, 488)</span>'
+  ];
+  const tape = $('#tape');
+  if (S.end.tapeDone){ tape.innerHTML = lines.map(l => `<span class="ln">${l}</span>`).join(''); S.comms.beat = 'hook'; drawComms(e.filed); return; }
+  (async () => {
+    await sleep(stepMs(2200));
+    for (const l of lines){ if (!$('#tape')) return; tape.insertAdjacentHTML('beforeend', `<span class="ln">${l}</span>`); await sleep(stepMs(550)); }
+    S.end.tapeDone = true; await sleep(stepMs(900)); if (S.stage === 'end'){ S.comms.beat = 'hook'; save(); drawComms(e.filed); }
+  })();
+}
+
+/* ================= chrome ================= */
+function restart(){ S = freshState(); save(); render(); }
+$('#hBal').addEventListener('click', () => { const p = $('#ledgerPop'); p.hidden = !p.hidden; if (!p.hidden) renderLedger(); });
+$('#ledgerClose').addEventListener('click', () => { $('#ledgerPop').hidden = true; });
+let restartArmed = false;
+function openHelp(){
+  const inProb = !!PROB[S.stage];
+  $('#refBtn').hidden = !inProb; $('#resetCode').hidden = !inProb;
+  restartArmed = false; $('#restartBtn').textContent = 'RESTART CHAPTER';
+  $('#helpBg').hidden = false; $('#helpClose').focus();
+}
+const closeHelp = () => { $('#helpBg').hidden = true; };
+$('#helpBtn').addEventListener('click', openHelp);
+$('#helpClose').addEventListener('click', closeHelp);
+$('#helpBg').addEventListener('click', e => { if (e.target.id === 'helpBg') closeHelp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape'){ closeHelp(); $('#ledgerPop').hidden = true; } });
+$('#refBtn').addEventListener('click', () => { if (cm && PROB[S.stage]){ cm.setValue(PROB[S.stage].reference); closeHelp(); } });
+$('#resetCode').addEventListener('click', () => { if (cm && PROB[S.stage]){ cm.setValue(PROB[S.stage].starter); closeHelp(); } });
+$('#restartBtn').addEventListener('click', () => {
+  if (!restartArmed){ restartArmed = true; $('#restartBtn').textContent = 'CLICK AGAIN TO RESTART'; return; }
+  closeHelp(); restart();
+});
+
+/* ================= boot ================= */
+// normalise a save taken mid-animation
+if (S.stage === 'h1' && (!S.h1 || !S.h1.pt)) S.stage = 'q1';
+if (S.stage === 'h2' && !S.h2) S.stage = 'q2';
+if (S.stage === 'end' && !S.end) S.stage = 'q3';
+render(); startClock(); bootRuntime();
+})();
+</script>
